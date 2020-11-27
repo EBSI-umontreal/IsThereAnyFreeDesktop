@@ -1,0 +1,1 @@
+"%~dp0curl.exe" --connect-timeout 5 "https://votresiteweb.com/IsThereAnyFreeDesktop/statut.php?poste=%COMPUTERNAME%&statut=na"
