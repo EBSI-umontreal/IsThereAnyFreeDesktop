@@ -1,0 +1,91 @@
+﻿<!DOCTYPE html>
+<html lang="fr-ca">
+	<head>
+		<meta charset="utf-8">
+		<title><?php echo $LaboNom; ?></title>
+		<style type="text/css">
+		table.udem-table-colored {
+			margin: 1em 0;
+			padding: 0;
+			border: 0;
+			border-spacing: 1px;
+			border-collapse: separate;
+			background: #ffffff;
+			width: 100%;
+			max-width: 100%;
+		}
+		table.udem-table-colored > tbody > tr.thead > td,
+		table.udem-table-colored > thead > tr > td,
+		table.udem-table-colored > tbody > tr.thead > th,
+		table.udem-table-colored > thead > tr > th {
+			background: #666666;
+			color: #ffffff;
+			border: 0;
+			text-align: left;
+		}
+		table.udem-table-colored > tbody > tr > td,
+		table.udem-table-colored > tbody > tr > th {
+			background: #ecebe9;
+			color: #000000;
+			border: 0;
+			text-align: left;
+		}
+		table.udem-table-colored > tbody > tr:nth-child(even) > td,
+		table.udem-table-colored > tbody > tr:nth-child(even) > th {
+			background: #fbf7f7;
+			color: #000000;
+		}
+		table.udem-table-unbordered {
+			border-width: 0;
+		}
+		table.udem-table-unbordered > thead > tr > th,
+		table.udem-table-unbordered > tbody > tr > th,
+		table.udem-table-unbordered > tfoot > tr > th,
+		table.udem-table-unbordered > thead > tr > td,
+		table.udem-table-unbordered > tbody > tr > td,
+		table.udem-table-unbordered > tfoot > tr > td {
+			border-width: 0;
+		}
+		
+		
+		.table > thead > tr > th,
+		.table > tbody > tr > th,
+		.table > tfoot > tr > th,
+		.table > thead > tr > td,
+		.table > tbody > tr > td,
+		.table > tfoot > tr > td {
+			padding: 8px;
+			line-height: 1.42857143;
+			vertical-align: top;
+			border-top: 1px solid #dddddd;
+		}
+		</style>
+		<script>
+		//Onload sans JQuery
+		document.addEventListener("DOMContentLoaded", function(event) { 
+			
+			//Ajouter événement onclick sur les liens RDP Windows
+			var lienWindows = document.getElementsByClassName("rdpwindows");
+			for (var i=0; i < lienWindows.length; i++) {
+				lienWindows[i].onclick = function(){
+					var poste = this.id,
+					rdpfileContent = "full address:s:" + poste + ".fil.umontreal.ca",
+					blob = new Blob([rdpfileContent], {type: "application/x-rdp"}),
+					url = window.URL.createObjectURL(blob);
+					
+					this.href = url;
+					this.target = '_blank';
+					
+					this.download = poste + '.rdp';
+				}
+			};
+			
+		});
+		</script>
+	</head>
+	<body>
+	<?php 
+		echo $PostesListe;
+	?>
+  </body>
+</html>

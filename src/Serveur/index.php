@@ -1,7 +1,7 @@
 ﻿<?php
 /*
 IsThereAnyFreeDesktop
-v.2.3 (20200415), Arnaud d’Alayer
+v.2.4 (20200506), Arnaud d’Alayer
 https://creativecommons.org/licenses/by-nc/4.0/
 */
 //require_once('CAS_authent.php');
@@ -17,8 +17,8 @@ try{
 	
 	$count=count($retour);
 	if ($count > 0) {
-		//$PostesListe.="<table class='table udem-table-colored'>\r\n";
-		$PostesListe.="<table border='1'>\r\n";
+		$PostesListe.="<table class='table udem-table-colored'>\r\n";
+		//$PostesListe.="<table border='1'>\r\n";
 		//$PostesListe.="<table>\r\n";
 		$PostesListe.="<tr><th>Poste</th><th>Commentaire</th><th>Statut</th></tr>\r\n";
 		
@@ -37,8 +37,10 @@ try{
 					$PosteStatut="<span style='color:orange'>Non déterminé</span>";
 					break;
 			}
-			//Construire ligne tableau
-			$PostesListe.="<tr><td>".$PosteAdresse."</td><td>".$poste['commentaire']."</td><td>".$PosteStatut."</td></tr>\r\n";
+			//Construire ligne tableau (si le poste est réservé, ne l'afficher qu'à l'utilisateur concerné ou aux administrateurs)
+			if ((!$poste['reserve']) or ($poste['reserve'] == $_SESSION['$codeDGTIC']) or $estAdmin) {
+				$PostesListe.="<tr><td>".$PosteAdresse."</td><td>".$poste['commentaire']."</td><td>".$PosteStatut."</td></tr>\r\n";
+			}
 		}
 		$PostesListe.="</table>\r\n";
 	}
@@ -47,40 +49,5 @@ catch(Exception $e){
 	$PostesListe.= "<p>Erreur avec la base de données. Si l'erreur persiste, veuillez <a href=mailto:'".$LaboContact."'>nous contacter.</p>";
 }
 header('Content-Type: text/html; charset=utf-8');
-//include 'D:\inetpub\cours\public_html\Templates\COURS-ressources-services_laboinfovirtuel.dwt';
+include 'IsThereAnyFreeDesktop.dwt';
 ?>
-<!DOCTYPE html>
-<html lang="fr-ca">
-	<head>
-		<meta charset="utf-8">
-		<title><?php echo $LaboNom; ?></title>
-		<script>
-		//Onload sans JQuery
-		document.addEventListener("DOMContentLoaded", function(event) { 
-			
-			//Ajouter événement onclick sur les liens RDP Windows
-			var lienWindows = document.getElementsByClassName("rdpwindows");
-			for (var i=0; i < lienWindows.length; i++) {
-				lienWindows[i].onclick = function(){
-					var poste = this.id,
-					rdpfileContent = "full address:s:" + poste + ".fil.umontreal.ca",
-					blob = new Blob([rdpfileContent], {type: "application/x-rdp"}),
-					url = window.URL.createObjectURL(blob);
-					
-					this.href = url;
-					this.target = '_blank';
-					
-					this.download = poste + '.rdp';
-				}
-			};
-			
-		});
-		</script>
-	</head>
-	<body>
-	<h1>Statut des postes</h1>
-	<?php 
-		echo $PostesListe;
-	?>
-  </body>
-</html>
