@@ -1,7 +1,7 @@
 ﻿<?php
 /*
 IsThereAnyFreeDesktop
-v.2.2 (20200326), Arnaud d’Alayer
+v.2.3 (20200415), Arnaud d’Alayer
 https://creativecommons.org/licenses/by-nc/4.0/
 */
 require_once('LAB_config.php');
