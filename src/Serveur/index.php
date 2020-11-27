@@ -1,11 +1,8 @@
 ﻿<?php
-/*
-IsThereAnyFreeDesktop
-v.2.4 (20200506), Arnaud d’Alayer
-https://creativecommons.org/licenses/by-nc/4.0/
-*/
-//require_once('CAS_authent.php');
 require_once('LAB_config.php');
+if ($CAS_authent){
+    require_once('CAS_authent.php');
+}
 
 $PostesListe = "";//OUTPUT
 
@@ -28,10 +25,16 @@ try{
 			switch ($poste['statut']) {
 				case "dispo":
 					$PosteStatut="<span style='color:green'>Disponible</span>";
-					$PosteStatut.="<br/>Se connecter&nbsp;: <a href='#' id='".$poste['poste']."' class='rdpwindows'>PC</a> | <a href='rdp://full%20address=s:$PosteAdresse:3389'>Mac</a>";
+					$PosteStatut.="<br/><a href='#' id='".$poste['poste']."' class='rdpwindows'>Se connecter</a>";
 					break;
 				case "oqp":
-					$PosteStatut="<span style='color:red'>Occupé</span>";
+					if ($poste['reserve']){
+						$PosteStatut="<span style='color:red'>Reprendre session ouverte</span>";
+						$PosteStatut.="<br/><a href='#' id='".$poste['poste']."' class='rdpwindows'>Se connecter</a>";
+					}
+					else{
+						$PosteStatut="<span style='color:red'>Occupé</span>";
+					}
 					break;
 				case "na":
 					$PosteStatut="<span style='color:orange'>Non déterminé</span>";
@@ -49,5 +52,5 @@ catch(Exception $e){
 	$PostesListe.= "<p>Erreur avec la base de données. Si l'erreur persiste, veuillez <a href=mailto:'".$LaboContact."'>nous contacter.</p>";
 }
 header('Content-Type: text/html; charset=utf-8');
-include 'IsThereAnyFreeDesktop.dwt';
+require_once('IsThereAnyFreeDesktop.dwt');
 ?>

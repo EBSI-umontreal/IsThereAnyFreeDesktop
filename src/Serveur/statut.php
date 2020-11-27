@@ -1,9 +1,4 @@
 ﻿<?php
-/*
-IsThereAnyFreeDesktop
-v.2.4 (20200506), Arnaud d’Alayer
-https://creativecommons.org/licenses/by-nc/4.0/
-*/
 require_once('LAB_config.php');
 
 $poste = strtolower($_GET['poste']);

@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="fr-ca">
 	<head>
+		<meta http-equiv="refresh" content="30">
 		<meta charset="utf-8">
 		<title><?php echo $LaboNom; ?></title>
 		<style type="text/css">
@@ -69,7 +70,7 @@
 			for (var i=0; i < lienWindows.length; i++) {
 				lienWindows[i].onclick = function(){
 					var poste = this.id,
-					rdpfileContent = "full address:s:" + poste + ".fil.umontreal.ca",
+					rdpfileContent = "full address:s:" + poste + "<?= $LaboSuffixeAdresse ?>",
 					blob = new Blob([rdpfileContent], {type: "application/x-rdp"}),
 					url = window.URL.createObjectURL(blob);
 					
