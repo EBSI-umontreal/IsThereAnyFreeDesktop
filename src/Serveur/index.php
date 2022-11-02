@@ -36,6 +36,9 @@ try{
 						$PosteStatut="<span style='color:red'>Occupé</span>";
 					}
 					break;
+				case "nordp":
+					$PosteStatut="<span style='color:orange'>Accès désactivé</span>";
+					break;
 				case "na":
 					$PosteStatut="<span style='color:orange'>Non déterminé</span>";
 					break;

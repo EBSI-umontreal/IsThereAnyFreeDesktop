@@ -7,6 +7,7 @@ $statut = strtolower($_GET['statut']);
 switch ($statut) {
 	case "dispo":
 	case "oqp":
+	case "nordp":
 	case "na":
 		echo $poste."=>".$statut;
 		$req = $bdd->prepare("UPDATE ".$table." SET statut=:statut WHERE poste=:poste");

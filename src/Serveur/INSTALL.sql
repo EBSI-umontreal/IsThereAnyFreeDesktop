@@ -30,7 +30,7 @@ SET time_zone = "+00:00";
 
 CREATE TABLE `IsThereAnyFreeDesktop` (
   `poste` text NOT NULL,
-  `statut` enum('dispo','oqp','na') NOT NULL DEFAULT 'dispo',
+  `statut` enum('dispo','oqp','nordp','na') NOT NULL DEFAULT 'dispo',
   `reserve` text,
   `commentaire` text
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

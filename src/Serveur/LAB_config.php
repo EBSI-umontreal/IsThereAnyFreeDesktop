@@ -1,5 +1,5 @@
 ﻿<?php
-//Version : 2.5 (20200529)
+//Version : 3 (20221102)
 //BD MySQL
 $pdo_options = array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8');
 $BD = "IsThereAnyFreeDesktop";
