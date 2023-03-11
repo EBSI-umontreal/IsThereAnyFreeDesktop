@@ -99,9 +99,10 @@ if exist %fileShutdown% del %fileShutdown% /f /q
 	REM 3.3 Si le statut change, on met … jour le fichier
 	if NOT "%statePrevious%"=="%stateCurrent%" (
 		call :ScreenAndLog "CHANGEMENT DE STATUT : %statePrevious%  vers %stateCurrent%"
-		call :sendStateToServer
+		REM call :sendStateToServer
 		set statePrevious=%stateCurrent%
 	)
+	call :sendStateToServer
 	
 	REM ===== 4. Attendre avant de verifier … nouveau l'‚tat du poste =====
 	TIMEOUT 15
