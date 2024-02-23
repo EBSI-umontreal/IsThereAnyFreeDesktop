@@ -31,7 +31,7 @@ Pour l’installation sur votre serveur :
 
 ## Postes de travail
 1.	Configurez les scripts du dossier `Station` :
-    * `set ServerURL` (dans `IsThereAnyFreeDesktop_service.bat` et `IsThereAnyFreeDesktop_stop.ba`t) : inscrivez l’URL vers le `statut.php` du serveur web.
+    * `set ServerURL` (dans `IsThereAnyFreeDesktop_service.bat` et `IsThereAnyFreeDesktop_stop.bat`) : inscrivez l’URL vers le `statut.php` du serveur web.
     * `set RDPusers` (dans `IsThereAnyFreeDesktop_service.bat`) : le nom du groupe du domaine des utilisateurs autorisés à se connecter à ajouter dans le groupe standard `Utilisateurs du Bureau à distance`.
     * `set RDPLocalGroup` (dans `IsThereAnyFreeDesktop_service.bat`) : si vous utilisez des postes dans une autre langue que le français, inscrivez le nom du groupe équivalent à `Utilisateurs du Bureau à distance`.
     * `set endRDPTime[i]` et `set startRDPTime[i]` (dans `IsThereAnyFreeDesktop_service.bat`) : 
@@ -42,7 +42,7 @@ Pour l’installation sur votre serveur :
     1. Activez le service Bureau à distance.
     2. Copiez les scripts configurés précédemment dans un dossier des postes (ex. `C:\program files (x86)\IsThereAnyFreeDesktop`).
     3. Inscrivez le script Batch de "service" dans le Planificateur de tâche à l’aide du script `_install.bat`.
-    4. Activer les scripts événementiels via les GPO domaine ou local (`gpedit.msc`) suivants :
+    4. Activez les scripts événementiels via les GPO domaine ou local (`gpedit.msc`) suivants :
        * Si ce n’est déjà fait, [désactivez le délai pour l’exécution des scripts](https://learn.microsoft.com/en-US/troubleshoot/windows-client/group-policy/logon-scripts-not-run-for-long-time).
        * `Configuration de l'ordinateur\Paramètres Windows\Scripts (démarrage/arrêt)\Démarrage` : exécuter `_IsThereAnyFreeDesktop_startup.bat`.
        * `Configuration de l'ordinateur\Paramètres Windows\Scripts (démarrage/arrêt)\Arrêt du système` : exécuter `_IsThereAnyFreeDesktop_shutdown.bat`.
