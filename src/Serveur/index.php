@@ -1,8 +1,6 @@
 ﻿<?php
 require_once('LAB_config.php');
-if ($CAS_authent){
-    require_once('CAS_authent.php');
-}
+
 
 $PostesListe = "";//OUTPUT
 
