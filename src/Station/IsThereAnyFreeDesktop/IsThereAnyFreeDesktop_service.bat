@@ -53,7 +53,7 @@ if exist %fileShutdown% del %fileShutdown% /f /q
 	REM 2.1 D‚terminer le jour (lundi, mardi, etc.)
 	REM https://serverfault.com/questions/94824/finding-day-of-week-in-batch-file-windows-server-2008
 	set "dayNumber="
-	for /f "skip=1" %%a in ('WMIC Path win32_LocalTime Get DayOfWeek') do if not defined dayNumber set dayNumber=%%a
+	for /f %%a in ('powershell -Command "(Get-Date).DayOfWeek.value__"') do set dayNumber=%%a
 	REM call set dayNumber=7
 	REM D‚terminer l'heure et comparer avec l'heure du service
 	call set startRDPTime=%%startRDPTime[%dayNumber%]%%
@@ -61,7 +61,7 @@ if exist %fileShutdown% del %fileShutdown% /f /q
 	
 	REM 2.2 D‚terminer l'heure actuelle
 	set "presentTime="
-	for /f "skip=1 delims=." %%a in ('wmic OS get localdatetime') do if not defined presentTime set presentTime=%%a
+	for /f %%a in ('powershell -Command "(Get-Date -Format yyyyMMddHHmmss)"') do set presentTime=%%a
 	call set compareTime=%presentTime:~8,4%
 	REM call set compareTime=0700
 	REM DEBUG
