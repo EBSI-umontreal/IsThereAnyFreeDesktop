@@ -1,7 +1,6 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr-ca">
 	<head>
-		<meta http-equiv="refresh" content="30">
 		<meta charset="utf-8">
 		<title><?php echo $LaboNom; ?></title>
 		<style type="text/css">
@@ -82,11 +81,15 @@
 			};
 			
 		});
+		
+		setTimeout(function(){
+			window.location.reload(1);
+		}, 30000);
 		</script>
 	</head>
 	<body>
 	<?php 
 		echo $PostesListe;
 	?>
-  </body>
+	</body>
 </html>

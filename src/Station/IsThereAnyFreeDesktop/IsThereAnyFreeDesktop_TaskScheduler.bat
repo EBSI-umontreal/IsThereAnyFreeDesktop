@@ -1,3 +1,4 @@
+ï»¿chcp 65001>nul
 @echo off
 setlocal enableExtensions enableDelayedExpansion
 set fileLog=C:\Windows\Temp\IsThereAnyFreeDesktop.log
@@ -6,11 +7,11 @@ set debug=
 
 
 :check_Permissions
-REM V‚rifier que le script est ex‚cut‚ avec des droits d'administration
+REM VÃ©rifier que le script est exÃ©cutÃ© avec des droits d'administration
 REM https://stackoverflow.com/questions/4051883/batch-script-how-to-check-for-admin-rights
 net session >nul 2>&1
 if NOT %errorLevel% == 0 (
-	call :ScreenAndLog ":TaskScheduler - Ce programme doit ˆtre ex‚cut‚ avec des droits d'administration"
+	call :ScreenAndLog ":TaskScheduler - Ce programme doit Ãªtre exÃ©cutÃ© avec des droits d'administration"
 	goto END
 )
 
@@ -21,12 +22,12 @@ CD "%PROGRAMFILES(X86)%\EBSI\IsThereAnyFreeDesktop"
 
 :LOOP
 if exist %fileShutdown% (
-	call :ScreenAndLog ":TaskScheduler - Le poste s'‚teint"
+	call :ScreenAndLog ":TaskScheduler - Le poste s'Ã©teint"
 	goto END
 ) else (
-	call :ScreenAndLog ":TaskScheduler - D‚marrage"
+	call :ScreenAndLog ":TaskScheduler - DÃ©marrage"
 	START /WAIT CMD.EXE /C IsThereAnyFreeDesktop_service.bat
-	call :ScreenAndLog ":TaskScheduler - La tache s'est arrˆt‚e"
+	call :ScreenAndLog ":TaskScheduler - La tache s'est arrÃªtÃ©e"
 	TIMEOUT 15
 	goto LOOP
 )
@@ -35,7 +36,8 @@ if exist %fileShutdown% (
 REM https://stackoverflow.com/questions/503846/how-do-i-echo-and-send-console-output-to-a-file-in-a-bat-script
 :ScreenAndLog
 set message=%DATE% %TIME% - %~1
-echo %message% & echo %message% >> %fileLog%
+echo %message%
+echo %message% | powershell -Command "$input | Out-File -FilePath '%fileLog%' -Append -Encoding UTF8"
 goto :eof
 
 

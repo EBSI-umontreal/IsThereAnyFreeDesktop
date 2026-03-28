@@ -31,6 +31,7 @@ SET time_zone = "+00:00";
 CREATE TABLE `IsThereAnyFreeDesktop` (
   `poste` text NOT NULL,
   `statut` enum('dispo','oqp','nordp','na') NOT NULL DEFAULT 'dispo',
+  `last_seen` datetime DEFAULT NULL,
   `reserve` text,
   `commentaire` text
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -39,11 +40,11 @@ CREATE TABLE `IsThereAnyFreeDesktop` (
 -- Déchargement des données de la table `IsThereAnyFreeDesktop`
 --
 
-INSERT INTO `IsThereAnyFreeDesktop` (`poste`, `statut`, `reserve`, `commentaire`) VALUES
-('test1', 'dispo', NULL, 'Acrobat Pro disponible'),
-('test2', 'na', NULL, 'Employés seulement'),
-('test3', 'oqp', NULL, NULL),
-('test4', 'oqp', 'dalayera', 'Poste réservé pour Arnaud d\'Alayer');
+INSERT INTO `IsThereAnyFreeDesktop` (`poste`, `statut`, `last_seen`, `reserve`, `commentaire`) VALUES
+('test1', 'dispo', NOW(), NULL, 'Acrobat Pro disponible'),
+('test2', 'na', NOW(), NULL, 'Employés seulement'),
+('test3', 'oqp', NOW(), NULL, NULL),
+('test4', 'oqp', NOW(), 'dalayera', 'Poste réservé pour Arnaud d\'Alayer');
 
 --
 -- Index pour les tables déchargées
@@ -53,7 +54,32 @@ INSERT INTO `IsThereAnyFreeDesktop` (`poste`, `statut`, `reserve`, `commentaire`
 -- Index pour la table `IsThereAnyFreeDesktop`
 --
 ALTER TABLE `IsThereAnyFreeDesktop`
-  ADD PRIMARY KEY (`poste`(15));
+  ADD PRIMARY KEY (`poste`(15)),
+  ADD KEY `idx_postes_last_seen` (`last_seen`);
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `IsThereAnyFreeDesktop_sessions`
+--
+
+CREATE TABLE `IsThereAnyFreeDesktop_sessions` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `poste` varchar(64) NOT NULL,
+  `username` varchar(128) NOT NULL,
+  `login` datetime NOT NULL,
+  `last_seen` datetime NOT NULL,
+  `logoff` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_sessions_poste` (`poste`),
+  KEY `idx_sessions_username` (`username`),
+  KEY `idx_sessions_login` (`login`),
+  KEY `idx_sessions_logoff` (`logoff`),
+  KEY `idx_sessions_username_login` (`username`,`login`),
+  KEY `idx_sessions_poste_login` (`poste`,`login`),
+  KEY `idx_sessions_open` (`poste`,`logoff`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

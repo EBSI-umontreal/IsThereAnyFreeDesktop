@@ -1,2 +1,3 @@
+﻿chcp 65001>nul
 CD "%PROGRAMFILES(X86)%\EBSI\IsThereAnyFreeDesktop"
 START /MIN CMD.EXE /C IsThereAnyFreeDesktop_stop.bat

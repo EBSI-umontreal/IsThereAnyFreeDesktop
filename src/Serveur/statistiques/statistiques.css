@@ -1,0 +1,95 @@
+/*
+ * Palette Set1 – ColorBrewer / UC Berkeley
+ * ------------------------------------------------
+ * Usage JS : SET1_PALETTE[0] = rouge, [1] = bleu, ...
+ * Usage CSS : var(--set1-rouge), var(--set1-bleu), ...
+ */
+:root {
+    --set1-rouge:  #e41a1c;
+    --set1-bleu:   #377eb8;
+    --set1-vert:   #4daf4a;
+    --set1-violet: #984ea3;
+    --set1-orange: #ff7f00;
+    --set1-jaune:  #ffff33;
+    --set1-brun:   #a65628;
+    --set1-rose:   #f781bf;
+    --set1-gris:   #999999;
+
+    --online-bg:     #edfaed;
+    --online-border: #4daf4a;
+    --online-text:   #1f6e1f;
+
+    --offline-bg:     #fdecea;
+    --offline-border: #e41a1c;
+    --offline-text:   #9c1010;
+}
+
+/* ------------------------------------------------
+ * Section Comparaison de sessions
+ * ------------------------------------------------ */
+.comp-ctrl {
+    display: flex;
+    gap: 12px;
+    align-items: start;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.comp-ctrl label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 14px;
+}
+
+.cmp-year-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.cmp-year-row input[type="number"] {
+    width: 90px;
+    padding: 3px 6px;
+    font-size: 14px;
+}
+
+.cmp-year-row button {
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+}
+
+/* ------------------------------------------------
+ * Cartes colorées "En direct"
+ * ------------------------------------------------ */
+.carte-online {
+    background: var(--online-bg);
+    border-color: var(--online-border);
+    color: var(--online-text);
+}
+
+.carte-online .titre {
+    color: var(--online-text);
+    font-weight: bold;
+}
+
+.carte-offline {
+    background: var(--offline-bg);
+    border-color: var(--offline-border);
+    color: var(--offline-text);
+}
+
+.carte-offline .titre {
+    color: var(--offline-text);
+    font-weight: bold;
+}
+
+.rt-statuts-list {
+    margin: 8px 0 0 0;
+    padding-left: 16px;
+    font-size: 13px;
+    line-height: 1.6;
+}

@@ -29,10 +29,23 @@ Pour l’installation sur votre serveur :
 3. Ajoutez dans votre table les noms des postes de travail de votre laboratoire à rendre disponible sur le site web.
 4. Configurez la ligne de connexion MySQL `$bdd` et les autres variables disponibles dans le fichier `LAB_config.php`.
 
+### Paramètres de collecte (LAB_config.php)
+
+Les paramètres suivants permettent de contrôler la collecte des statistiques :
+
+* `$enableSessionCollection = true;`
+  * `true` : collecte des sessions active (table `IsThereAnyFreeDesktop_sessions` utilisée).
+  * `false` : aucune écriture dans la table de sessions (mode sans collecte statistique).
+* `$anonymousSessionUsername = 'anonymous';`
+  * Valeur utilisée quand la collecte est active, mais qu'aucun username n'est transmis par le poste client.
+
 ## Postes de travail
 1.	Configurez les scripts du dossier `Station` :
     * `set ServerURL` (dans `IsThereAnyFreeDesktop_service.bat` et `IsThereAnyFreeDesktop_stop.bat`) : inscrivez l’URL vers le `statut.php` du serveur web.
     * `set RDPusers` (dans `IsThereAnyFreeDesktop_service.bat`) : le nom du groupe du domaine des utilisateurs autorisés à se connecter à ajouter dans le groupe standard `Utilisateurs du Bureau à distance`.
+    * `set SendUsername` (dans `IsThereAnyFreeDesktop_service.bat`) :
+      * `1` (par défaut) : envoie le username au serveur (`statut.php`).
+      * `0` : n'envoie pas le username (protection de la vie privée côté poste).
     * `set RDPLocalGroup` (dans `IsThereAnyFreeDesktop_service.bat`) : si vous utilisez des postes dans une autre langue que le français, inscrivez le nom du groupe équivalent à `Utilisateurs du Bureau à distance`.
     * `set endRDPTime[i]` et `set startRDPTime[i]` (dans `IsThereAnyFreeDesktop_service.bat`) : 
       *	inscrivez l’heure de fin et de début de l’accès à distance pour l’accès exclusif en présentiel dans le format `hhmm`, où `hh` est en format 24h (ex. `2200`). 
@@ -53,6 +66,59 @@ Quelques recommandations supplémentaires, mais facultatives :
 3. Configurez le menu Démarrer pour masquer les options `Arrêter`, `Redémarrer` et `Déconnecter` (pour ne laisser que l’option de fermeture de session `Se déconnecter`). Par GPO, ces modifications correspondent aux options suivantes :
     1. `Configuration de l’ordinateur\Modèles d’administration\Menu Démarrer et barre des tâches\Supprimer et empêcher l’accès aux commandes Arrêter, Redémarrer, Mettre en veille et Mettre en veille prolongée`.
     2. `Configuration de l’ordinateur\Modèles d’administration\Composants Windows\Services Bureau à distance\Hôte de la session Bureau à distance\Environnement de session à distance\Supprimer l’élément « Déconnecter » de la boite de dialogue Arrêt`.
+
+## Mise à niveau pour la version 4.0
+
+Si vous aviez déjà une installation précédente **et souhaitez activer/profiter du module de statistiques v4**, exécutez les étapes suivantes (en adaptant les noms de la base et des tables si nécessaire).
+
+Si vous utilisez uniquement l'affichage de disponibilité (sans statistiques), le code reste compatible avec une base de données de type v3.x grâce aux garde-fous intégrés.
+
+### 1) Ajouter le champ `last_seen` sur la table `IsThereAnyFreeDesktop`
+* Le champ `last_seen` améliore la détection des postes hors ligne (heartbeat). Sans ce champ, l'affichage reste fonctionnel mais avec une détection moins fine.
+
+```sql
+ALTER TABLE IsThereAnyFreeDesktop
+  ADD COLUMN last_seen DATETIME NULL AFTER statut,
+  ADD INDEX idx_postes_last_seen (last_seen);
+
+UPDATE IsThereAnyFreeDesktop
+SET last_seen = NOW()
+WHERE last_seen IS NULL;
+```
+
+### 2) Créer la table `IsThereAnyFreeDesktop_sessions` (si absente)
+
+```sql
+CREATE TABLE IF NOT EXISTS IsThereAnyFreeDesktop_sessions (
+  id bigint unsigned NOT NULL AUTO_INCREMENT,
+  poste varchar(64) NOT NULL,
+  username varchar(128) NOT NULL,
+  login datetime NOT NULL,
+  last_seen datetime NOT NULL,
+  logoff datetime DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY idx_sessions_poste (poste),
+  KEY idx_sessions_username (username),
+  KEY idx_sessions_login (login),
+  KEY idx_sessions_logoff (logoff),
+  KEY idx_sessions_username_login (username, login),
+  KEY idx_sessions_poste_login (poste, login),
+  KEY idx_sessions_open (poste, logoff)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+```
+
+### 3) Redéployer le script côté postes
+
+Redéployez aussi `IsThereAnyFreeDesktop_service.bat` sur les postes afin d'utiliser les nouveaux paramètres client, dont l'expédition du username.
+
+Dans le script, le paramètre suivant contrôle l'envoi du username :
+
+* `set SendUsername=1` : envoi du username au serveur (`statut.php`).
+* `set SendUsername=0` : aucun username envoyé (mode vie privée).
+
+### 4) Activer la collecte
+Si `$enableSessionCollection = false` (dans `LAB_config.php`), la table `IsThereAnyFreeDesktop_sessions` n'est pas utilisée.
+
 
 ## Réseau (VPN)
 Cette étape consiste à vous assurer que votre réseau permettra à vos utilisateurs de rejoindre les postes de travail dans votre intranet, par exemple à l’aide d’une connexion sécurisée VPN.

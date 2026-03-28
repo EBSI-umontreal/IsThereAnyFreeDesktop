@@ -1,12 +1,14 @@
+ï»¿chcp 65001>nul
 @echo off
 setlocal enableExtensions enableDelayedExpansion
 set fileLog=C:\Windows\Temp\IsThereAnyFreeDesktop.log
 set fileShutdown=C:\Windows\Temp\IsThereAnyFreeDesktop_shutdown.txt
 set debug=
 
-set RDPLocalGroup="Utilisateurs du Bureau … distance"
+set RDPLocalGroup="Utilisateurs du Bureau Ã  distance"
 set RDPusers=domain\rdp-group
 set ServerURL=https://votresiteweb.com/IsThereAnyFreeDesktop/statut.php
+set SendUsername=1
 
 REM 1=lundi, 2=mardi, etc.
 set endRDPTime[1]=0800
@@ -26,40 +28,40 @@ set startRDPTime[7]=0000
 
 
 :check_Permissions
-REM V‚rifier que le script est ex‚cut‚ avec des droits d'administration
+REM VÃ©rifier que le script est exÃ©cutÃ© avec des droits d'administration
 REM https://stackoverflow.com/questions/4051883/batch-script-how-to-check-for-admin-rights
 net session >nul 2>&1
 if NOT %errorLevel% == 0 (
-	call :ScreenAndLog ":check_Permissions - Ce programme doit ˆtre ex‚cut‚ avec des droits d'administration"
+	call :ScreenAndLog ":check_Permissions - Ce programme doit Ãªtre exÃ©cutÃ© avec des droits d'administration"
 	goto END
 )
 
 
 :MAIN
-REM Param‚trage de d‚marrage
+REM ParamÃ©trage de dÃ©marrage
 set statePrevious=startup
-call :ScreenAndLog "DMARRAGE"
+call :ScreenAndLog "DÃ‰MARRAGE"
 if exist %fileShutdown% del %fileShutdown% /f /q
 
 :LOOP
-	REM ===== 1. Arrˆter boucle si le poste est en train de s'‚teindre =====
+	REM ===== 1. ArrÃªter boucle si le poste est en train de s'Ã©teindre =====
 	if exist %fileShutdown% (
 		call :ScreenAndLog "EXTINCTION EN COURS"
 		goto END
 	)
 	
-	REM ===== 1. D‚terminer s'il faut activer ou d‚sactiver le RDP =====
+	REM ===== 1. DÃ©terminer s'il faut activer ou dÃ©sactiver le RDP =====
 	
-	REM 2.1 D‚terminer le jour (lundi, mardi, etc.)
+	REM 2.1 DÃ©terminer le jour (lundi, mardi, etc.)
 	REM https://serverfault.com/questions/94824/finding-day-of-week-in-batch-file-windows-server-2008
 	set "dayNumber="
 	for /f %%a in ('powershell -Command "(Get-Date).DayOfWeek.value__"') do set dayNumber=%%a
 	REM call set dayNumber=7
-	REM D‚terminer l'heure et comparer avec l'heure du service
+	REM DÃ©terminer l'heure et comparer avec l'heure du service
 	call set startRDPTime=%%startRDPTime[%dayNumber%]%%
 	call set endRDPTime=%%endRDPTime[%dayNumber%]%%
 	
-	REM 2.2 D‚terminer l'heure actuelle
+	REM 2.2 DÃ©terminer l'heure actuelle
 	set "presentTime="
 	for /f %%a in ('powershell -Command "(Get-Date -Format yyyyMMddHHmmss)"') do set presentTime=%%a
 	call set compareTime=%presentTime:~8,4%
@@ -68,11 +70,11 @@ if exist %fileShutdown% del %fileShutdown% /f /q
 	if defined debug (
 		call :ScreenAndLog ":LOOP - Aujourd'hui nous sommes le jour %dayNumber%"
 		call :ScreenAndLog ":LOOP - Horaire de fin du RDP : %endRDPTime%"
-		call :ScreenAndLog ":LOOP - Horaire de d‚but du RDP : %startRDPTime%"
+		call :ScreenAndLog ":LOOP - Horaire de dÃ©but du RDP : %startRDPTime%"
 		call :ScreenAndLog ":LOOP - Actuellement il est %presentTime% : comparaison sur %compareTime%"
 	)
 	
-	REM 2.3 D‚cision d'activer ou non le RDP et appeler la sous-routine associ‚e
+	REM 2.3 DÃ©cision d'activer ou non le RDP et appeler la sous-routine associÃ©e
 	if %compareTime% GTR %startRDPTime% (
 		call :rdpActivate
 	) else (
@@ -83,20 +85,22 @@ if exist %fileShutdown% del %fileShutdown% /f /q
 		)
 	)
 	
-	REM ===== 3. Informer le serveur de l'‚tat du poste =====
-	REM 3.1 Commencer par l'‚tat du RDP
+	REM ===== 3. Informer le serveur de l'Ã©tat du poste =====
+	REM 3.1 Commencer par l'Ã©tat du RDP
 	if %RDPactivated%==1 (
 		call set stateCurrent=dispo
 	) else (
 		call set stateCurrent=nordp
 	)
+	set "currentUser="
+	call :detectCurrentUser
 	
-	REM 3.2 Verifier si une session est ouverte : nous cherchons "console" (local) ou "rdp" (… distance) dans la sortie de la commande quser
+	REM 3.2 Verifier si une session est ouverte : nous cherchons "console" (local) ou "rdp" (Ã  distance) dans la sortie de la commande quser
 	if "%stateCurrent%" NEQ "nordp" (
-		quser | findstr /i "console rdp" >nul && (call set stateCurrent=oqp)
+		if defined currentUser (call set stateCurrent=oqp)
 	)
 	
-	REM 3.3 Si le statut change, on met … jour le fichier
+	REM 3.3 Si le statut change, on met Ã  jour le fichier
 	if NOT "%statePrevious%"=="%stateCurrent%" (
 		call :ScreenAndLog "CHANGEMENT DE STATUT : %statePrevious%  vers %stateCurrent%"
 		REM call :sendStateToServer
@@ -104,7 +108,7 @@ if exist %fileShutdown% del %fileShutdown% /f /q
 	)
 	call :sendStateToServer
 	
-	REM ===== 4. Attendre avant de verifier … nouveau l'‚tat du poste =====
+	REM ===== 4. Attendre avant de verifier Ã  nouveau l'Ã©tat du poste =====
 	TIMEOUT 15
 goto LOOP
 
@@ -119,7 +123,7 @@ goto :eof
 :rdpActivate
 call :rdpCheck
 if %RDPactivated%==1 (
-	if defined debug call :ScreenAndLog ":rdpActivate - RDP est d‚j… actif = Ne rien faire"
+	if defined debug call :ScreenAndLog ":rdpActivate - RDP est dÃ©jÃ  actif = Ne rien faire"
 ) else (
 	if defined debug call :ScreenAndLog ":rdpActivate - RDP est inactif = Activer"
 	net localgroup %RDPLocalGroup% %RDPusers% /add >> %fileLog%
@@ -130,20 +134,20 @@ goto :eof
 :rdpDisable
 call :rdpCheck
 if %RDPactivated%==1 (
-	if defined debug call :ScreenAndLog ":rdpDisable - RDP est actif = D‚sactiver"
+	if defined debug call :ScreenAndLog ":rdpDisable - RDP est actif = DÃ©sactiver"
 	net localgroup %RDPLocalGroup% %RDPusers% /delete >> %fileLog%
 	call :rdpLogoff
 ) else (
-	if defined debug call :ScreenAndLog ":rdpDisable - RDP est d‚j… inactif = Ne rien faire"
+	if defined debug call :ScreenAndLog ":rdpDisable - RDP est dÃ©jÃ  inactif = Ne rien faire"
 )
 goto :eof
 
 :rdpCheck
 net localgroup %RDPLocalGroup% | findstr /c:"%RDPusers%" >nul && (call set RDPactivated=1) || (call set RDPactivated=0)
 if defined debug (
-	call :ScreenAndLog ":rdpCheck - Groupe local des utilisateurs … distance : "%RDPLocalGroup%""
-	call :ScreenAndLog ":rdpCheck - Groupe des usagers autoris‚s … faire du RDP : %RDPusers%"
-	call :ScreenAndLog ":rdpCheck - RDP activ‚? %RDPactivated%"
+	call :ScreenAndLog ":rdpCheck - Groupe local des utilisateurs Ã  distance : "%RDPLocalGroup%""
+	call :ScreenAndLog ":rdpCheck - Groupe des usagers autorisÃ©s Ã  faire du RDP : %RDPusers%"
+	call :ScreenAndLog ":rdpCheck - RDP activÃ©? %RDPactivated%"
 )
 goto :eof
 
@@ -157,12 +161,28 @@ TIMEOUT 15
 goto :eof
 
 :sendStateToServer
-if defined debug (
-	REM call :ScreenAndLog ":sendStateToServer - Exp‚dition de la requˆte : %ServerURL% ? poste=%COMPUTERNAME% &statut=%stateCurrent%"
-	call :ScreenAndLog "%ServerURL%?poste=%COMPUTERNAME%-statut=%stateCurrent%"
+if "%SendUsername%"=="1" (
+	if defined debug (
+		call :ScreenAndLog "%ServerURL%?poste=%COMPUTERNAME%&statut=%stateCurrent%&username=%currentUser%"
+	)
+	curl -s --connect-timeout 5 -G "%ServerURL%" --data-urlencode "poste=%COMPUTERNAME%" --data-urlencode "statut=%stateCurrent%" --data-urlencode "username=%currentUser%" >> %fileLog%
+) else (
+	if defined debug (
+		call :ScreenAndLog "%ServerURL%?poste=%COMPUTERNAME%&statut=%stateCurrent%"
+	)
+	curl -s --connect-timeout 5 -G "%ServerURL%" --data-urlencode "poste=%COMPUTERNAME%" --data-urlencode "statut=%stateCurrent%" >> %fileLog%
 )
-curl -s --connect-timeout 5 "%ServerURL%?poste=%COMPUTERNAME%&statut=%stateCurrent%" >> %fileLog%
 call :ScreenAndLog " "
+goto :eof
+
+:detectCurrentUser
+set "currentUser="
+for /f %%a in ('powershell -NoProfile -Command "$u=(Get-CimInstance Win32_ComputerSystem).UserName; if($u){$u.Split('\\')[-1]}"') do (
+	set "currentUser=%%a"
+	goto :detectCurrentUser_done
+)
+:detectCurrentUser_done
+if defined currentUser if "!currentUser:~0,1!"==">" set "currentUser=!currentUser:~1!"
 goto :eof
 
 :END
