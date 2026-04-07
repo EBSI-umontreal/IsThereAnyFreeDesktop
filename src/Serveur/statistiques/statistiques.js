@@ -6,6 +6,9 @@ let cmpDayChart;
 let cmpMonthChart;
 let cmpWeekdayChart;
 let liveRefreshTimer;
+let userSessionsCurrentPage = 1;
+let userSessionsTotalPages = 1;
+let userSessionsLastUsername = '';
 
 const SET1_PALETTE = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'];
 
@@ -37,6 +40,86 @@ function setErreurComparaison(message) {
     if (el) {
         el.textContent = message || '';
     }
+}
+
+function setErreurUtilisateur(message) {
+    const el = document.getElementById('erreur-utilisateur');
+    if (el) {
+        el.textContent = message || '';
+    }
+}
+
+function setUserPaging(pagination) {
+    const info = document.getElementById('userPagingInfo');
+    const btnPrev = document.getElementById('btnUserPrev');
+    const btnNext = document.getElementById('btnUserNext');
+    if (!info || !btnPrev || !btnNext) { return; }
+
+    info.textContent = 'Page ' + pagination.page + ' / ' + pagination.total_pages + ' (' + pagination.total_rows + ' résultats)';
+    btnPrev.disabled = !pagination.has_prev;
+    btnNext.disabled = !pagination.has_next;
+}
+
+function setTableUtilisateur(rows) {
+    const tbody = document.getElementById('tbodyUserSessions');
+    if (!tbody) { return; }
+
+    tbody.innerHTML = '';
+    rows.forEach(function (row) {
+        const tr = document.createElement('tr');
+        const values = [
+            row.login || '-',
+            row.poste || '-',
+            row.last_seen || '-',
+            row.logoff || '-',
+            row.duree_min,
+            row.session_ouverte ? 'Oui' : 'Non'
+        ];
+        values.forEach(function (v) {
+            const td = document.createElement('td');
+            td.textContent = (v == null || v === '') ? '-' : String(v);
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+}
+
+async function chargerSessionsUtilisateur(page) {
+    const input = document.getElementById('userUsername');
+    if (!input) { return; }
+
+    let username = String(input.value || '').trim().toLowerCase();
+    if (!username) {
+        setErreurUtilisateur('Veuillez saisir un username.');
+        setTableUtilisateur([]);
+        setUserPaging({ page: 1, total_pages: 1, total_rows: 0, has_prev: false, has_next: false });
+        return;
+    }
+
+    if (username !== userSessionsLastUsername) {
+        page = 1;
+    }
+    if (!page || page < 1) {
+        page = 1;
+    }
+
+    setErreurUtilisateur('');
+
+    const url = 'api.php?action=utilisateur&username=' + encodeURIComponent(username) + '&page=' + encodeURIComponent(page);
+    const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+        setErreurUtilisateur((data && data.error) ? data.error : 'Erreur lors du chargement des sessions utilisateur.');
+        return;
+    }
+
+    userSessionsLastUsername = username;
+    userSessionsCurrentPage = (data.pagination && data.pagination.page) ? data.pagination.page : 1;
+    userSessionsTotalPages = (data.pagination && data.pagination.total_pages) ? data.pagination.total_pages : 1;
+
+    setTableUtilisateur(data.donnees || []);
+    setUserPaging(data.pagination || { page: 1, total_pages: 1, total_rows: 0, has_prev: false, has_next: false });
 }
 
 /**
@@ -124,22 +207,81 @@ async function chargerTempsReel() {
     setRealtime(data);
 }
 
-/**
- * Remplit le tableau détaillé des statistiques journalières.
- * Le tableau reste dans un accordéon pour éviter d'alourdir l'interface.
- * @param {Array<{jour:string, nb_sessions:number, duree_moyenne_min:number, duree_totale_h:number}>} rows
- */
-function setTable(rows) {
-    const tbody = document.getElementById('tbodyStats');
-    tbody.innerHTML = '';
+function setRowsTable(tbodyId, rows, columns) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) { return; }
 
+    tbody.innerHTML = '';
     rows.forEach(function (row) {
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td>' + row.jour + '</td>' +
-            '<td>' + row.nb_sessions + '</td>' +
-            '<td>' + row.duree_moyenne_min + '</td>' +
-            '<td>' + row.duree_totale_h + '</td>';
+        columns.forEach(function (col) {
+            const td = document.createElement('td');
+            const rawValue = row[col.key];
+            td.textContent = col.format ? col.format(rawValue, row) : String(rawValue != null ? rawValue : '');
+            tr.appendChild(td);
+        });
         tbody.appendChild(tr);
+    });
+}
+
+function setJsonView(preId, payload) {
+    const pre = document.getElementById(preId);
+    if (!pre) { return; }
+    pre.textContent = JSON.stringify(payload, null, 2);
+}
+
+function setTableParJour(rows) {
+    setRowsTable('tbodyStatsDay', rows, [
+        { key: 'jour' },
+        { key: 'nb_sessions' },
+        { key: 'duree_moyenne_min' },
+        { key: 'duree_totale_h' }
+    ]);
+}
+
+function setTableParMois(rows) {
+    setRowsTable('tbodyStatsMonth', rows, [
+        { key: 'mois' },
+        { key: 'nb_sessions' },
+        { key: 'duree_moyenne_min' },
+        { key: 'duree_totale_h' }
+    ]);
+}
+
+function setTableParSemaine(rows) {
+    setRowsTable('tbodyStatsWeekday', rows, [
+        { key: 'jour_semaine' },
+        { key: 'nb_sessions' },
+        { key: 'duree_moyenne_min' },
+        { key: 'duree_totale_h' }
+    ]);
+}
+
+function setTableParHeure(rows) {
+    setRowsTable('tbodyStatsHour', rows, [
+        { key: 'heure' },
+        { key: 'nb_sessions' },
+        { key: 'duree_moyenne_min' },
+        { key: 'duree_totale_h' }
+    ]);
+}
+
+function initTabs() {
+    const tabGroups = document.querySelectorAll('.stats-tabs');
+    tabGroups.forEach(function (group) {
+        const buttons = group.querySelectorAll('.tab-btn');
+        const panels = group.querySelectorAll('.tab-panel');
+        buttons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                const target = button.getAttribute('data-tab');
+                buttons.forEach(function (b) {
+                    b.classList.toggle('is-active', b === button);
+                });
+                panels.forEach(function (panel) {
+                    panel.classList.toggle('is-active', panel.getAttribute('data-panel') === target);
+                });
+            });
+        });
     });
 }
 
@@ -838,7 +980,14 @@ async function charger() {
     }
 
     setCards(dataParJour.resume);
-    setTable(dataParJour.donnees);
+    setTableParJour(dataParJour.donnees);
+    setTableParMois(dataParMois.donnees);
+    setTableParSemaine(dataParSemaine.donnees);
+    setTableParHeure(dataParHeure.donnees);
+    setJsonView('jsonStatsDay', dataParJour.donnees);
+    setJsonView('jsonStatsMonth', dataParMois.donnees);
+    setJsonView('jsonStatsWeekday', dataParSemaine.donnees);
+    setJsonView('jsonStatsHour', dataParHeure.donnees);
     setChart(dataParJour.donnees);
     setMonthsChart(dataParMois.donnees);
     setWeekdayChart(dataParSemaine.donnees);
@@ -855,15 +1004,43 @@ const modeInitial = restoreFiltersFromCookies();
 // 2. Afficher la zone correspondante
 applierModeActif(modeInitial);
 
+// 2b. Initialiser les onglets Graphique / Tableau / JSON
+initTabs();
+
 // 3. Écouter les changements de mode
 document.getElementsByName('modeFiltre').forEach(function (radio) {
     radio.addEventListener('change', function () {
         applierModeActif(this.value);
+        // Décale le chargement au tick suivant pour laisser le navigateur
+        // appliquer le changement de mode avant la lecture des filtres.
+        setTimeout(charger, 0);
     });
 });
 
 // 4. Bouton charger
 document.getElementById('btnCharger').addEventListener('click', charger);
+
+// 4b. Sessions par utilisateur
+document.getElementById('btnUserLoad').addEventListener('click', function () {
+    chargerSessionsUtilisateur(1);
+});
+document.getElementById('userUsername').addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        chargerSessionsUtilisateur(1);
+    }
+});
+document.getElementById('btnUserPrev').addEventListener('click', function () {
+    if (userSessionsCurrentPage > 1) {
+        chargerSessionsUtilisateur(userSessionsCurrentPage - 1);
+    }
+});
+document.getElementById('btnUserNext').addEventListener('click', function () {
+    if (userSessionsCurrentPage < userSessionsTotalPages) {
+        chargerSessionsUtilisateur(userSessionsCurrentPage + 1);
+    }
+});
+setUserPaging({ page: 1, total_pages: 1, total_rows: 0, has_prev: false, has_next: false });
 
 // 5. Navigation session (mode session académique)
 document.getElementById('btnSessionPrev').addEventListener('click', function () {

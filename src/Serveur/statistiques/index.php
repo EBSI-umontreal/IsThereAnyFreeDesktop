@@ -115,38 +115,131 @@ $defaultAnnee = date('Y');
 
     <div class="zone-graphe">
         <h2>Sessions par jour</h2>
-        <canvas id="statsChart" height="90"></canvas>
+        <div class="stats-tabs">
+            <div class="tabs-nav">
+                <button type="button" class="tab-btn is-active" data-tab="graph">Graphique</button>
+                <button type="button" class="tab-btn" data-tab="table">Tableau</button>
+                <button type="button" class="tab-btn" data-tab="json">JSON</button>
+            </div>
+            <div class="tab-panel is-active" data-panel="graph">
+                <canvas id="statsChart" height="90"></canvas>
+            </div>
+            <div class="tab-panel" data-panel="table">
+                <div class="tab-table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Jour</th>
+                                <th>Nombre de sessions</th>
+                                <th>Durée moyenne (min)</th>
+                                <th>Durée totale (heures)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyStatsDay"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-panel" data-panel="json">
+                <pre id="jsonStatsDay" class="json-view"></pre>
+            </div>
+        </div>
     </div>
 
     <div class="zone-graphe">
         <h2>Sessions par mois</h2>
-        <canvas id="monthsChart" height="90"></canvas>
+        <div class="stats-tabs">
+            <div class="tabs-nav">
+                <button type="button" class="tab-btn is-active" data-tab="graph">Graphique</button>
+                <button type="button" class="tab-btn" data-tab="table">Tableau</button>
+                <button type="button" class="tab-btn" data-tab="json">JSON</button>
+            </div>
+            <div class="tab-panel is-active" data-panel="graph">
+                <canvas id="monthsChart" height="90"></canvas>
+            </div>
+            <div class="tab-panel" data-panel="table">
+                <div class="tab-table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Mois</th>
+                                <th>Nombre de sessions</th>
+                                <th>Durée moyenne (min)</th>
+                                <th>Durée totale (heures)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyStatsMonth"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-panel" data-panel="json">
+                <pre id="jsonStatsMonth" class="json-view"></pre>
+            </div>
+        </div>
     </div>
 
     <div class="zone-graphe">
         <h2>Sessions par jour de semaine</h2>
-        <canvas id="weekdayChart" height="90"></canvas>
+        <div class="stats-tabs">
+            <div class="tabs-nav">
+                <button type="button" class="tab-btn is-active" data-tab="graph">Graphique</button>
+                <button type="button" class="tab-btn" data-tab="table">Tableau</button>
+                <button type="button" class="tab-btn" data-tab="json">JSON</button>
+            </div>
+            <div class="tab-panel is-active" data-panel="graph">
+                <canvas id="weekdayChart" height="90"></canvas>
+            </div>
+            <div class="tab-panel" data-panel="table">
+                <div class="tab-table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Jour de semaine</th>
+                                <th>Nombre de sessions</th>
+                                <th>Durée moyenne (min)</th>
+                                <th>Durée totale (heures)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyStatsWeekday"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-panel" data-panel="json">
+                <pre id="jsonStatsWeekday" class="json-view"></pre>
+            </div>
+        </div>
     </div>
 
     <div class="zone-graphe">
         <h2>Sessions par heure de début</h2>
-        <canvas id="hoursChart" height="90"></canvas>
+        <div class="stats-tabs">
+            <div class="tabs-nav">
+                <button type="button" class="tab-btn is-active" data-tab="graph">Graphique</button>
+                <button type="button" class="tab-btn" data-tab="table">Tableau</button>
+                <button type="button" class="tab-btn" data-tab="json">JSON</button>
+            </div>
+            <div class="tab-panel is-active" data-panel="graph">
+                <canvas id="hoursChart" height="90"></canvas>
+            </div>
+            <div class="tab-panel" data-panel="table">
+                <div class="tab-table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Heure</th>
+                                <th>Nombre de sessions</th>
+                                <th>Durée moyenne (min)</th>
+                                <th>Durée totale (heures)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyStatsHour"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-panel" data-panel="json">
+                <pre id="jsonStatsHour" class="json-view"></pre>
+            </div>
+        </div>
     </div>
-
-    <details>
-        <summary>Afficher les données détaillées</summary>
-        <table>
-            <thead>
-                <tr>
-                    <th>Jour</th>
-                    <th>Nombre de sessions</th>
-                    <th>Durée moyenne (min)</th>
-                    <th>Durée totale (heures)</th>
-                </tr>
-            </thead>
-            <tbody id="tbodyStats"></tbody>
-        </table>
-    </details>
 
     <h1>Comparaison de sessions</h1>
 
@@ -183,7 +276,39 @@ $defaultAnnee = date('Y');
         <canvas id="cmpWeekdayChart" height="90"></canvas>
     </div>
 
-    <script src="statistiques-cookies.js"></script>
-    <script src="statistiques.js"></script>
+    <h1>Sessions d'un utilisateur</h1>
+
+    <div class="zone-graphe">
+        <div class="user-ctrl">
+            <label>Username
+                <input type="text" id="userUsername" placeholder="ex: p1234567" />
+            </label>
+            <button type="button" id="btnUserLoad" style="align-self:end">Charger</button>
+        </div>
+        <div id="erreur-utilisateur" class="erreur"></div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Login</th>
+                    <th>Poste</th>
+                    <th>Dernière activité</th>
+                    <th>Logoff</th>
+                    <th>Durée (min)</th>
+                    <th>Ouverte</th>
+                </tr>
+            </thead>
+            <tbody id="tbodyUserSessions"></tbody>
+        </table>
+        <div class="user-paging">
+            <button type="button" id="btnUserPrev">&lt; Précédent</button>
+            <span id="userPagingInfo">Page 1 / 1</span>
+            <button type="button" id="btnUserNext">Suivant &gt;</button>
+        </div>
+    </div>
+
+    <!-- Cache-busting automatique: filemtime() change à chaque modification du fichier. -->
+    <!-- Aucun timestamp manuel à maintenir dans l'URL (?v=...). -->
+    <script src="statistiques-cookies.js?v=<?php echo filemtime(__DIR__.'/statistiques-cookies.js'); ?>"></script>
+    <script src="statistiques.js?v=<?php echo filemtime(__DIR__.'/statistiques.js'); ?>"></script>
 </body>
 </html>

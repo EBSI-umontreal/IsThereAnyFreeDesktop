@@ -1,20 +1,9 @@
 <?php
 require_once('LAB_config.php');
 
-$tablePostesName = isset($tablePostes) ? $tablePostes : (isset($table) ? $table : 'IsThereAnyFreeDesktop');
-$tableSessionsName = isset($tableSessions) ? $tableSessions : 'sessions';
-$enableSessionCollectionFlag = isset($enableSessionCollection) ? (bool)$enableSessionCollection : true;
-$anonymousSessionUsernameValue = isset($anonymousSessionUsername) ? strtolower(trim((string)$anonymousSessionUsername)) : 'anonymous';
-if ($anonymousSessionUsernameValue === '') {
-	$anonymousSessionUsernameValue = 'anonymous';
-}
-
-$poste = strtolower($_GET['poste']);
-$statut = strtolower($_GET['statut']);
-$username = '';
-if (isset($_GET['username'])) {
-	$username = strtolower(trim($_GET['username']));
-}
+$poste   = strtolower($_GET['poste']);
+$statut  = strtolower($_GET['statut']);
+$username = isset($_GET['username']) ? strtolower(trim($_GET['username'])) : '';
 
 switch ($statut) {
 	case "dispo":
@@ -26,45 +15,40 @@ switch ($statut) {
 			echo "=>".$username;
 		}
 		try {
-			$req = $bdd->prepare("UPDATE ".$tablePostesName." SET statut=:statut, last_seen=NOW() WHERE poste=:poste");
-			$req->execute(array(':poste' => $poste, ':statut' => $statut));
-		} catch (Exception $e) {
-			$req = $bdd->prepare("UPDATE ".$tablePostesName." SET statut=:statut WHERE poste=:poste");
-			$req->execute(array(':poste' => $poste, ':statut' => $statut));
-		}
+			$bdd->prepare("UPDATE $tablePostes SET statut=:statut, last_seen=NOW() WHERE poste=:poste")
+				->execute([':poste' => $poste, ':statut' => $statut]);
 
-		if ($enableSessionCollectionFlag) {
-			try {
-				if ($statut === "oqp") {
+			if ($enableSessionCollection) {
+				if ($statut === "oqp" || ($statut === "nordp" && $username !== '')) {
 					if ($username === '') {
-						$username = $anonymousSessionUsernameValue;
+						$username = $anonymousSessionUsername;
 					}
+					// Fermer toute session ouverte d'un autre utilisateur sur ce poste
+					$bdd->prepare("UPDATE $tableSessions SET logoff=last_seen WHERE poste=:poste AND logoff IS NULL AND username<>:username")
+						->execute([':poste' => $poste, ':username' => $username]);
 
-					$req = $bdd->prepare("UPDATE ".$tableSessionsName." SET logoff=NOW(), last_seen=NOW() WHERE poste=:poste AND logoff IS NULL AND username<>:username");
-					$req->execute(array(':poste' => $poste, ':username' => $username));
-
-					$req = $bdd->prepare("SELECT id FROM ".$tableSessionsName." WHERE poste=:poste AND username=:username AND logoff IS NULL ORDER BY login DESC LIMIT 1");
-					$req->execute(array(':poste' => $poste, ':username' => $username));
-
+					$req = $bdd->prepare("SELECT id FROM $tableSessions WHERE poste=:poste AND username=:username AND logoff IS NULL ORDER BY login DESC LIMIT 1");
+					$req->execute([':poste' => $poste, ':username' => $username]);
 					$session = $req->fetch();
 
 					if ($session) {
-						$req = $bdd->prepare("UPDATE ".$tableSessionsName." SET last_seen=NOW() WHERE id=:id");
-						$req->execute(array(':id' => $session['id']));
+						$bdd->prepare("UPDATE $tableSessions SET last_seen=NOW() WHERE id=:id")
+							->execute([':id' => $session['id']]);
 					} else {
-						$req = $bdd->prepare("INSERT INTO ".$tableSessionsName." (poste, username, login, last_seen, logoff) VALUES (:poste, :username, NOW(), NOW(), NULL)");
-						$req->execute(array(':poste' => $poste, ':username' => $username));
+						$bdd->prepare("INSERT INTO $tableSessions (poste, username, login, last_seen, logoff) VALUES (:poste, :username, NOW(), NOW(), NULL)")
+							->execute([':poste' => $poste, ':username' => $username]);
 					}
 				} else {
-					$req = $bdd->prepare("UPDATE ".$tableSessionsName." SET logoff=NOW(), last_seen=NOW() WHERE poste=:poste AND logoff IS NULL");
-					$req->execute(array(':poste' => $poste));
+					// Poste libre ou nordp sans username : fermer les sessions ouvertes
+					$bdd->prepare("UPDATE $tableSessions SET logoff=last_seen WHERE poste=:poste AND logoff IS NULL")
+						->execute([':poste' => $poste]);
 				}
-			} catch (Exception $e) {
-				// La mécanique de statut doit rester fonctionnelle même si la table sessions n'est pas disponible.
 			}
+		} catch (Exception $e) {
+			// Silencieux : le statut doit rester fonctionnel même si la BD est indisponible.
 		}
 		break;
-	default :
+	default:
 		echo "Erreur : statut invalide";
 		exit();
 }

@@ -36,6 +36,9 @@ switch (true) {
     case isset($_GET['tempsreel']):
         $action = 'tempsreel';
         break;
+    case isset($_GET['utilisateur']):
+        $action = 'utilisateur';
+        break;
 }
 
 // Réponse d'accueil quand l'API est appelée sans paramètre.
@@ -43,13 +46,14 @@ if (empty($_GET)) {
     echo json_encode(array(
         'ok' => true,
         'message' => 'API statistiques prête.',
-        'actions' => array('parjour', 'parheure', 'parmois', 'parsemaine', 'tempsreel'),
+        'actions' => array('parjour', 'parheure', 'parmois', 'parsemaine', 'tempsreel', 'utilisateur'),
         'usage' => array(
             '?tempsreel=1',
             '?parjour=1&datedebut=YYYY-MM-DD&datefin=YYYY-MM-DD',
             '?parmois=1&session=H|E|A&annee=YYYY',
             '?parsemaine=1&session=H|E|A&annee=YYYY',
-            '?parheure=1&session=H|E|A&annee=YYYY'
+            '?parheure=1&session=H|E|A&annee=YYYY',
+            '?action=utilisateur&username=nom.utilisateur&page=1'
         )
     ));
     exit();
@@ -152,6 +156,100 @@ if ($action === 'tempsreel') {
     exit();
 }
 
+// ---------------------------------------------------------------------------
+// Endpoint utilisateur : sessions d'un username (pagination 25/page)
+// ---------------------------------------------------------------------------
+if ($action === 'utilisateur') {
+    $username = isset($_GET['username']) ? strtolower(trim($_GET['username'])) : '';
+    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    if ($page < 1) { $page = 1; }
+    $pageSize = 25;
+
+    if ($username === '') {
+        http_response_code(400);
+        echo json_encode(array(
+            'ok' => false,
+            'error' => 'Paramètre username requis.'
+        ));
+        exit();
+    }
+
+    try {
+        $sqlCount = "SELECT COUNT(*) FROM ".$tableSessionsName." WHERE LOWER(username) = :username";
+        $reqCount = $bdd->prepare($sqlCount);
+        $reqCount->execute(array(':username' => $username));
+        $totalRows = (int)$reqCount->fetchColumn();
+        $totalPages = $totalRows > 0 ? (int)ceil($totalRows / $pageSize) : 1;
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+        $offset = ($page - 1) * $pageSize;
+
+        $sql = "
+            SELECT
+                id,
+                poste,
+                username,
+                login,
+                last_seen,
+                logoff,
+                ROUND(GREATEST(TIMESTAMPDIFF(SECOND, login, COALESCE(logoff, last_seen, NOW())), 0) / 60, 2) AS duree_min
+            FROM ".$tableSessionsName."
+            WHERE LOWER(username) = :username
+            ORDER BY login DESC, id DESC
+            LIMIT :limit OFFSET :offset
+        ";
+
+        $req = $bdd->prepare($sql);
+        $req->bindValue(':username', $username, PDO::PARAM_STR);
+        $req->bindValue(':limit', $pageSize, PDO::PARAM_INT);
+        $req->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $req->execute();
+        $rows = $req->fetchAll(PDO::FETCH_ASSOC);
+
+        $donnees = array();
+        foreach ($rows as $row) {
+            $donnees[] = array(
+                'id' => (int)$row['id'],
+                'poste' => $row['poste'],
+                'username' => $row['username'],
+                'login' => $row['login'],
+                'last_seen' => $row['last_seen'],
+                'logoff' => $row['logoff'],
+                'duree_min' => (float)$row['duree_min'],
+                'session_ouverte' => $row['logoff'] === null
+            );
+        }
+
+        echo json_encode(array(
+            'ok' => true,
+            'action' => 'utilisateur',
+            'parametres' => array(
+                'username' => $username,
+                'page' => $page,
+                'page_size' => $pageSize,
+                'tableSessions' => $tableSessionsName
+            ),
+            'pagination' => array(
+                'page' => $page,
+                'page_size' => $pageSize,
+                'total_rows' => $totalRows,
+                'total_pages' => $totalPages,
+                'has_prev' => $page > 1,
+                'has_next' => $page < $totalPages
+            ),
+            'donnees' => $donnees
+        ));
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(array(
+            'ok' => false,
+            'error' => 'Erreur serveur lors du chargement des sessions utilisateur.'
+        ));
+    }
+    exit();
+}
+
 $datedebut = isset($_GET['datedebut']) ? trim($_GET['datedebut']) : '';
 $datefin   = isset($_GET['datefin'])   ? trim($_GET['datefin'])   : '';
 
@@ -249,20 +347,49 @@ try {
             ':datedebut' => $datedebut,
             ':datefin' => $datefin
         ));
-        $rows = $req->fetchAll(PDO::FETCH_ASSOC);
+        $rawRows = $req->fetchAll(PDO::FETCH_ASSOC);
+
+        $rowsByDay = array();
+        foreach ($rawRows as $row) {
+            $jour = $row['jour'];
+            $dureeMoyenneSec = (float)$row['duree_moyenne_sec'];
+            $dureeTotaleSec = (float)$row['duree_totale_sec'];
+            $rowsByDay[$jour] = array(
+                'jour' => $jour,
+                'nb_sessions' => (int)$row['nb_sessions'],
+                'duree_moyenne_sec' => $dureeMoyenneSec,
+                'duree_moyenne_min' => round($dureeMoyenneSec / 60, 2),
+                'duree_totale_sec' => $dureeTotaleSec,
+                'duree_totale_h' => round($dureeTotaleSec / 3600, 2)
+            );
+        }
+
+        $rows = array();
+        $current = DateTime::createFromFormat('Y-m-d', $datedebut);
+        $end = DateTime::createFromFormat('Y-m-d', $datefin);
+        while ($current <= $end) {
+            $jourKey = $current->format('Y-m-d');
+            if (isset($rowsByDay[$jourKey])) {
+                $rows[] = $rowsByDay[$jourKey];
+            } else {
+                $rows[] = array(
+                    'jour' => $jourKey,
+                    'nb_sessions' => 0,
+                    'duree_moyenne_sec' => 0.0,
+                    'duree_moyenne_min' => 0.0,
+                    'duree_totale_sec' => 0.0,
+                    'duree_totale_h' => 0.0
+                );
+            }
+            $current->modify('+1 day');
+        }
 
         $sessionsTotal = 0;
         $dureeTotaleSec = 0.0;
-        foreach ($rows as &$row) {
-            $row['nb_sessions'] = (int)$row['nb_sessions'];
-            $row['duree_moyenne_sec'] = (float)$row['duree_moyenne_sec'];
-            $row['duree_moyenne_min'] = round($row['duree_moyenne_sec'] / 60, 2);
-            $row['duree_totale_sec'] = (float)$row['duree_totale_sec'];
-            $row['duree_totale_h'] = round($row['duree_totale_sec'] / 3600, 2);
+        foreach ($rows as $row) {
             $sessionsTotal += $row['nb_sessions'];
             $dureeTotaleSec += $row['duree_totale_sec'];
         }
-        unset($row);
 
         $nbJours = count($rows);
         $dureeMoyennePondereeSec = $sessionsTotal > 0 ? round($dureeTotaleSec / $sessionsTotal, 2) : 0.0;

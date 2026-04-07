@@ -93,3 +93,92 @@
     font-size: 13px;
     line-height: 1.6;
 }
+
+/* ------------------------------------------------
+ * Onglets Graphique / Tableau / JSON
+ * ------------------------------------------------ */
+.stats-tabs {
+    margin-top: 8px;
+    --stats-panel-height: 480px;
+}
+
+.tabs-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.tab-btn {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    background: #f7f7f7;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.tab-btn.is-active {
+    background: #e9f2fb;
+    border-color: #377eb8;
+}
+
+.tab-panel {
+    display: none;
+    height: var(--stats-panel-height);
+    overflow: auto;
+}
+
+.tab-panel.is-active {
+    display: block;
+}
+
+.tab-panel canvas {
+    max-height: 100%;
+}
+
+.tab-table-wrap {
+    overflow: auto;
+    height: 100%;
+}
+
+.json-view {
+    margin: 0;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fafafa;
+    height: 100%;
+    overflow: auto;
+    box-sizing: border-box;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* ------------------------------------------------
+ * Sessions utilisateur
+ * ------------------------------------------------ */
+.user-ctrl {
+    display: flex;
+    gap: 12px;
+    align-items: end;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.user-ctrl label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 14px;
+}
+
+.user-ctrl input[type="text"] {
+    min-width: 240px;
+    padding: 4px 6px;
+}
+
+.user-paging {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 10px;
+}
