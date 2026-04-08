@@ -8,7 +8,8 @@ set debug=
 set RDPLocalGroup="Utilisateurs du Bureau à distance"
 set RDPusers=domain\rdp-group
 set ServerURL=https://votresiteweb.com/IsThereAnyFreeDesktop/statut.php
-set SendUsername=1
+REM SendUsername: 1 = envoyer username, 0 = ne pas envoyer
+set /a SendUsername=1
 
 REM 1=lundi, 2=mardi, etc.
 set endRDPTime[1]=0800
@@ -161,7 +162,8 @@ TIMEOUT 15
 goto :eof
 
 :sendStateToServer
-if "%SendUsername%"=="1" (
+if defined debug call :ScreenAndLog ":sendStateToServer - SendUsername=%SendUsername%"
+if %SendUsername% EQU 1 (
 	if defined debug (
 		call :ScreenAndLog "%ServerURL%?poste=%COMPUTERNAME%&statut=%stateCurrent%&username=%currentUser%"
 	)
