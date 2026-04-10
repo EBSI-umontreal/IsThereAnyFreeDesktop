@@ -3,9 +3,10 @@
 setlocal enableExtensions enableDelayedExpansion
 set fileLog=C:\Windows\Temp\IsThereAnyFreeDesktop.log
 set fileShutdown=C:\Windows\Temp\IsThereAnyFreeDesktop_shutdown.txt
+REM debug: 1 = activer logs détaillés, 0 = désactiver
 set debug=
 
-set ServerURL=https://votresiteweb.com/IsThereAnyFreeDesktop/statut.php
+set ServerURL=https://laboratoires.fas.umontreal.ca/ebsi/statut.php
 
 
 :check_Permissions
@@ -36,7 +37,7 @@ goto :eof
 
 
 :sendStateToServer
-if defined debug (
+if %debug%==1 (
 	call :ScreenAndLog ":sendStateToServer - Expédition de la requête : %ServerURL%?poste=%COMPUTERNAME%&statut=%stateCurrent%"
 )
 curl -s --connect-timeout 5 "%ServerURL%?poste=%COMPUTERNAME%&statut=%stateCurrent%" >> %fileLog%

@@ -86,7 +86,9 @@ SET last_seen = NOW()
 WHERE last_seen IS NULL;
 ```
 
-### 2) Créer la table `IsThereAnyFreeDesktop_sessions` (si absente)
+### 2) Créer ou mettre à niveau la table `IsThereAnyFreeDesktop_sessions`
+
+Si la table n'existe pas encore, créez-la avec la structure complète ci-dessous (incluant `session_type`) :
 
 ```sql
 CREATE TABLE IF NOT EXISTS IsThereAnyFreeDesktop_sessions (
@@ -96,6 +98,7 @@ CREATE TABLE IF NOT EXISTS IsThereAnyFreeDesktop_sessions (
   login datetime NOT NULL,
   last_seen datetime NOT NULL,
   logoff datetime DEFAULT NULL,
+  session_type enum('console','rdp') NOT NULL DEFAULT 'console',
   PRIMARY KEY (id),
   KEY idx_sessions_poste (poste),
   KEY idx_sessions_username (username),
@@ -103,8 +106,17 @@ CREATE TABLE IF NOT EXISTS IsThereAnyFreeDesktop_sessions (
   KEY idx_sessions_logoff (logoff),
   KEY idx_sessions_username_login (username, login),
   KEY idx_sessions_poste_login (poste, login),
-  KEY idx_sessions_open (poste, logoff)
+  KEY idx_sessions_open (poste, logoff),
+  KEY idx_sessions_type (session_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+```
+
+Si la table existe déjà (mise à niveau d'une installation antérieure), ajoutez le champ et son index :
+
+```sql
+ALTER TABLE IsThereAnyFreeDesktop_sessions
+  ADD COLUMN session_type enum('console','rdp') NOT NULL DEFAULT 'console' AFTER logoff,
+  ADD INDEX idx_sessions_type (session_type);
 ```
 
 ### 3) Redéployer le script côté postes

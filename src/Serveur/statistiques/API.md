@@ -12,6 +12,40 @@ Documentation du module de statistiques JSON de `IsThereAnyFreeDesktop`.
 - Les réponses sont retournées en JSON.
 - Les paramètres sont passés en HTTP GET.
 - La source des données est la table de sessions configurée via `$tableSessions` dans [../LAB_config.php](../LAB_config.php).
+- Le module expose un mode `public` et un mode `privé` (déverrouillage via clé API).
+
+### Mode public/privé (clé API)
+
+Configuration cote serveur dans [../LAB_config.php](../LAB_config.php):
+
+- `$statsApiKeys` : tableau `nom => cle_api`.
+- `$statsApiCookieName` : nom du cookie utilise par l'API.
+- `$statsApiCookieTtlSeconds` : durée de vie du cookie privé.
+
+Comportement:
+
+- En mode `public`: usernames masqués dans `historiqueposte`, endpoint `utilisateur` bloqué.
+- En mode `privé`: données complètes disponibles.
+
+### Enveloppe de réponse standard
+
+Pour les endpoints métier, la structure visée est :
+
+```json
+{
+  "ok": true,
+  "action": "nom_action",
+  "parametres": { },
+  "resume": { },
+  "donnees": [ ],
+  "pagination": { }
+}
+```
+
+Notes :
+- `resume` est optionnel selon l'endpoint.
+- `pagination` n'est présent que pour les endpoints paginés (ex. utilisateur).
+- `donnees` peut être un tableau ou un objet selon le besoin.
 
 ## Exemples prêts pour Postman
 
@@ -57,6 +91,28 @@ Tu peux créer une collection "Statistiques API" avec ces requêtes :
 - URL : `https://votresiteweb.com/IsThereAnyFreeDesktop/statistiques/api.php?parjour=1&datedebut=2026-04-30&datefin=2026-04-01`
 - Résultat attendu : HTTP `400` + JSON d'erreur (`datedebut` > `datefin`)
 
+### 9) Liste des postes
+
+- URL : `https://votresiteweb.com/IsThereAnyFreeDesktop/statistiques/api.php?postes=1`
+
+### 10) Historique d'un poste
+
+- URL : `https://votresiteweb.com/IsThereAnyFreeDesktop/statistiques/api.php?historiqueposte=1&poste=LABOVI1-L-EBSI&date=2026-04-09`
+
+### 11) État d'accès (public/privé)
+
+- URL : `https://votresiteweb.com/IsThereAnyFreeDesktop/statistiques/api.php?action=access`
+
+### 12) Activer le mode privé (clé API)
+
+- URL : `https://votresiteweb.com/IsThereAnyFreeDesktop/statistiques/api.php?action=auth`
+- Methode : `POST`
+- Body (`x-www-form-urlencoded`) : `api_key=<votre_cle>`
+
+### 13) Revenir en mode public
+
+- URL : `https://votresiteweb.com/IsThereAnyFreeDesktop/statistiques/api.php?action=logout`
+
 Astuce Postman : ajoute une variable d'environnement `{{statsApiBase}}` pour éviter de répéter l'URL de base.
 
 ## Sélection de la période
@@ -95,7 +151,122 @@ GET api.php?parmois=1&session=H&annee=2025
 GET api.php?parsemaine=1&session=H&annee=2025
 GET api.php?parheure=1&session=A&annee=2024
 GET api.php?tempsreel=1
+GET api.php?postes=1
+GET api.php?historiqueposte=1&poste=LABOVI1-L-EBSI&date=2026-04-09
 ```
+
+## Endpoint : liste des postes
+
+### Requête
+
+```
+GET api.php?postes=1
+```
+
+### Réponse
+
+```json
+{
+  "ok": true,
+  "action": "postes",
+  "donnees": [
+    "LABOVI1-L-EBSI",
+    "LABOVI2-L-EBSI"
+  ]
+}
+```
+
+## Endpoint : historique d'un poste
+
+### Requête
+
+```
+GET api.php?historiqueposte=1&poste=LABOVI1-L-EBSI&date=2026-04-09
+```
+
+### Réponse
+
+```json
+{
+  "ok": true,
+  "action": "historiqueposte",
+  "parametres": {
+    "poste": "LABOVI1-L-EBSI",
+    "date": "2026-04-09",
+    "tableSessions": "IsThereAnyFreeDesktop_sessions"
+  },
+  "resume": {
+    "nb_sessions": 2,
+    "nb_sessions_console": 1,
+    "nb_sessions_rdp": 1,
+    "duree_console_min": 63,
+    "duree_rdp_min": 140
+  },
+  "donnees": [
+    {
+      "id": 123,
+      "poste": "LABOVI1-L-EBSI",
+      "username": "p1234567",
+      "session_type": "console",
+      "login": "2026-04-09 09:12:00",
+      "last_seen": "2026-04-09 10:15:00",
+      "logoff": "2026-04-09 10:15:00",
+      "session_ouverte": false
+    }
+  ]
+}
+```
+
+Note : `fin_calculee`, `start_minute`, `end_minute`, `start_label`, `end_label` et `duree_min` ne sont plus renvoyés par l'API `historiqueposte`; ces valeurs sont déduites côté client.
+
+En mode `public`, le champ `username` n'est pas renvoyé dans `donnees`.
+
+## Endpoint : sessions d'un utilisateur
+
+### Requête
+
+```
+GET api.php?action=utilisateur&username=p1234567&page=1
+```
+
+Cet endpoint est disponible uniquement en mode `privé`.
+En mode `public`, l'API retourne `HTTP 403` avec le code `PRIVATE_ACCESS_REQUIRED`.
+
+### Réponse
+
+```json
+{
+  "ok": true,
+  "action": "utilisateur",
+  "parametres": {
+    "username": "p1234567",
+    "page": 1,
+    "page_size": 25,
+    "tableSessions": "IsThereAnyFreeDesktop_sessions"
+  },
+  "pagination": {
+    "page": 1,
+    "page_size": 25,
+    "total_rows": 87,
+    "total_pages": 4,
+    "has_prev": false,
+    "has_next": true
+  },
+  "donnees": [
+    {
+      "id": 987,
+      "poste": "LABOVI1-L-EBSI",
+      "username": "p1234567",
+      "login": "2026-04-09 09:12:00",
+      "last_seen": "2026-04-09 10:15:00",
+      "logoff": "2026-04-09 10:15:00",
+      "session_ouverte": false
+    }
+  ]
+}
+```
+
+Note : `duree_min` n'est plus renvoyé par l'API `utilisateur`; cette valeur est déduite côté client à partir de `login` et `logoff` (ou `last_seen` / heure courante si session ouverte).
 
 ## Endpoint : statistiques par jour
 
@@ -280,15 +451,17 @@ GET api.php?tempsreel=1
     "postes_occupes_en_ligne": 26,
     "taux_occupation_postes_en_ligne": 54.17
   },
-  "statuts_postes_en_ligne": {
-    "dispo": 18,
-    "na": 2,
-    "nordp": 2,
-    "oqp": 26
-  },
-  "statuts_postes_hors_ligne": {
-    "dispo": 10,
-    "nordp": 2
+  "donnees": {
+    "statuts_postes_en_ligne": {
+      "dispo": 18,
+      "na": 2,
+      "nordp": 2,
+      "oqp": 26
+    },
+    "statuts_postes_hors_ligne": {
+      "dispo": 10,
+      "nordp": 2
+    }
   }
 }
 ```
@@ -311,14 +484,23 @@ GET api.php
 {
   "ok": true,
   "message": "API statistiques prête.",
-  "actions": ["parjour", "parheure", "parmois", "parsemaine", "tempsreel"],
+  "actions": ["parjour", "parheure", "parmois", "parsemaine", "tempsreel", "postes", "historiqueposte"],
   "usage": [
     "?tempsreel=1",
+    "?postes=1",
+    "?historiqueposte=1&poste=LABOVI1-L-EBSI&date=YYYY-MM-DD",
     "?parjour=1&datedebut=YYYY-MM-DD&datefin=YYYY-MM-DD",
     "?parmois=1&session=H|E|A&annee=YYYY",
     "?parsemaine=1&session=H|E|A&annee=YYYY",
-    "?parheure=1&session=H|E|A&annee=YYYY"
-  ]
+    "?parheure=1&session=H|E|A&annee=YYYY",
+    "?action=access"
+  ],
+  "acces": {
+    "private_access": false,
+    "mode": "public",
+    "owner": null,
+    "can_auth": true
+  }
 }
 ```
 
@@ -330,14 +512,50 @@ GET api.php
 | `400`     | `datedebut` > `datefin`                                      |
 | `400`     | Valeur de `session` inconnue                                 |
 | `400`     | `annee` absent ou hors plage 2000–2100 (si `session` fourni) |
-| `400`     | Action inconnue (ni `parjour`, `parheure`, `parmois`, `parsemaine`, `tempsreel`) |
+| `400`     | `poste` absent pour `historiqueposte`                        |
+| `400`     | Paramètre `api_key` absent pour `action=auth`                |
+| `400`     | Action inconnue                                              |
+| `401`     | Clé API invalide (`action=auth`)                              |
+| `403`     | Endpoint réservé au mode privé                                |
+| `403`     | Auth par clé API désactivée                                   |
 | `500`     | Erreur serveur durant le calcul                              |
 
-Format de la réponse d'erreur :
+Format de la réponse d'erreur (uniformisé) :
 
 ```json
 {
   "ok": false,
+  "action": "historiqueposte",
+  "code": "INVALID_DATE",
   "error": "Description de l'erreur."
 }
 ```
+
+Exemples de `code` :
+- `MISSING_POSTE`
+- `MISSING_USERNAME`
+- `INVALID_DATE`
+- `INVALID_DATE_RANGE`
+- `INVALID_SESSION`
+- `UNKNOWN_ACTION`
+- `MISSING_API_KEY`
+- `INVALID_API_KEY`
+- `PRIVATE_ACCESS_REQUIRED`
+- `AUTH_DISABLED`
+- `SERVER_ERROR_*`
+
+## Test Postman: mode public vs privé
+
+1. Mode public:
+- Appeler `GET api.php?action=logout`.
+- Appeler `GET api.php?action=access` et vérifier `"mode": "public"`.
+- Appeler `GET api.php?action=utilisateur&username=test&page=1` et vérifier le `403`.
+
+2. Mode privé:
+- Appeler `POST api.php?action=auth` avec body `api_key=<cle_valide>`.
+- Vérifier que Postman conserve le cookie de réponse.
+- Appeler `GET api.php?action=access` et vérifier `"mode": "prive"`.
+- Refaire `GET api.php?action=utilisateur&username=test&page=1`.
+
+3. Retour public:
+- Appeler `GET api.php?action=logout` puis re-tester `action=access`.

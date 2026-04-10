@@ -70,6 +70,7 @@ CREATE TABLE `IsThereAnyFreeDesktop_sessions` (
   `login` datetime NOT NULL,
   `last_seen` datetime NOT NULL,
   `logoff` datetime DEFAULT NULL,
+  `session_type` enum('console','rdp') NOT NULL DEFAULT 'console',
   PRIMARY KEY (`id`),
   KEY `idx_sessions_poste` (`poste`),
   KEY `idx_sessions_username` (`username`),
@@ -77,7 +78,8 @@ CREATE TABLE `IsThereAnyFreeDesktop_sessions` (
   KEY `idx_sessions_logoff` (`logoff`),
   KEY `idx_sessions_username_login` (`username`,`login`),
   KEY `idx_sessions_poste_login` (`poste`,`login`),
-  KEY `idx_sessions_open` (`poste`,`logoff`)
+  KEY `idx_sessions_open` (`poste`,`logoff`),
+  KEY `idx_sessions_type` (`session_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 COMMIT;

@@ -12,6 +12,100 @@ $heartbeatTimeout = isset($heartbeatTimeoutSeconds) ? (int)$heartbeatTimeoutSeco
 if ($heartbeatTimeout < 1) {
     $heartbeatTimeout = 300;
 }
+$statsApiKeys = (isset($statsApiKeys) && is_array($statsApiKeys)) ? $statsApiKeys : array();
+$statsApiCookieName = isset($statsApiCookieName) ? (string)$statsApiCookieName : 'itafd_stats_api_key';
+$statsApiCookieTtlSeconds = isset($statsApiCookieTtlSeconds) ? (int)$statsApiCookieTtlSeconds : 2592000;
+if ($statsApiCookieTtlSeconds < 300) {
+    $statsApiCookieTtlSeconds = 300;
+}
+
+function resolveStatsPrivateAccess($statsApiKeys, $statsApiCookieName)
+{
+    $cookieValue = isset($_COOKIE[$statsApiCookieName]) ? trim((string)$_COOKIE[$statsApiCookieName]) : '';
+    if ($cookieValue === '' || count($statsApiKeys) === 0) {
+        return array('private_access' => false, 'mode' => 'public', 'owner' => null, 'can_auth' => count($statsApiKeys) > 0);
+    }
+
+    foreach ($statsApiKeys as $owner => $apiKey) {
+        $candidate = trim((string)$apiKey);
+        if ($candidate === '') {
+            continue;
+        }
+        if (hash_equals($candidate, $cookieValue)) {
+            return array('private_access' => true, 'mode' => 'prive', 'owner' => (string)$owner, 'can_auth' => true);
+        }
+    }
+
+    return array('private_access' => false, 'mode' => 'public', 'owner' => null, 'can_auth' => count($statsApiKeys) > 0);
+}
+
+function setStatsApiCookie($cookieName, $cookieValue, $ttlSeconds)
+{
+    setcookie($cookieName, $cookieValue, array(
+        'expires' => time() + $ttlSeconds,
+        'path' => '/',
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ));
+}
+
+function clearStatsApiCookie($cookieName)
+{
+    setcookie($cookieName, '', array(
+        'expires' => time() - 3600,
+        'path' => '/',
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ));
+}
+
+function getSelectablePostes($bdd, $tablePostesName, $tableSessionsName)
+{
+    $postes = array();
+
+    try {
+        $reqPostes = $bdd->prepare("SELECT poste FROM ".$tablePostesName." WHERE ((poste LIKE 'LABOVI%') OR (reserve IS NOT NULL)) AND poste IS NOT NULL AND TRIM(poste) <> '' ORDER BY poste");
+        $reqPostes->execute();
+        $rows = $reqPostes->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as $row) {
+            $poste = trim((string)$row['poste']);
+            if ($poste !== '') {
+                $postes[strtolower($poste)] = $poste;
+            }
+        }
+    } catch (Exception $e) {
+        // Fallback sur la table des sessions plus bas.
+    }
+
+    if (count($postes) === 0) {
+        $reqSessionsPostes = $bdd->prepare("SELECT DISTINCT poste FROM ".$tableSessionsName." WHERE poste IS NOT NULL AND TRIM(poste) <> '' ORDER BY poste");
+        $reqSessionsPostes->execute();
+        $rows = $reqSessionsPostes->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as $row) {
+            $poste = trim((string)$row['poste']);
+            if ($poste !== '') {
+                $postes[strtolower($poste)] = $poste;
+            }
+        }
+    }
+
+    natcasesort($postes);
+    return array_values($postes);
+}
+
+function emitErrorResponse($httpStatus, $action, $code, $message)
+{
+    http_response_code((int)$httpStatus);
+    echo json_encode(array(
+        'ok' => false,
+        'action' => $action,
+        'code' => $code,
+        'error' => $message
+    ));
+    exit();
+}
 
 // ---------------------------------------------------------------------------
 // Résolution de l'action demandée
@@ -36,25 +130,115 @@ switch (true) {
     case isset($_GET['tempsreel']):
         $action = 'tempsreel';
         break;
+    case isset($_GET['postes']):
+        $action = 'postes';
+        break;
+    case isset($_GET['historiqueposte']):
+        $action = 'historiqueposte';
+        break;
     case isset($_GET['utilisateur']):
         $action = 'utilisateur';
         break;
 }
 
+$statsAccess = resolveStatsPrivateAccess($statsApiKeys, $statsApiCookieName);
+$hasPrivateAccess = !empty($statsAccess['private_access']);
+
+if ($action === 'auth') {
+    if (count($statsApiKeys) === 0) {
+        emitErrorResponse(403, 'auth', 'AUTH_DISABLED', 'Authentification par clé API désactivée sur ce serveur.');
+    }
+
+    $submittedKey = '';
+    if (isset($_POST['api_key'])) {
+        $submittedKey = trim((string)$_POST['api_key']);
+    } elseif (isset($_GET['api_key'])) {
+        $submittedKey = trim((string)$_GET['api_key']);
+    }
+
+    if ($submittedKey === '') {
+        emitErrorResponse(400, 'auth', 'MISSING_API_KEY', 'Parametre api_key requis.');
+    }
+
+    $matchedOwner = null;
+    foreach ($statsApiKeys as $owner => $apiKey) {
+        $candidate = trim((string)$apiKey);
+        if ($candidate !== '' && hash_equals($candidate, $submittedKey)) {
+            $matchedOwner = (string)$owner;
+            break;
+        }
+    }
+
+    if ($matchedOwner === null) {
+        clearStatsApiCookie($statsApiCookieName);
+        emitErrorResponse(401, 'auth', 'INVALID_API_KEY', 'Cle API invalide.');
+    }
+
+    setStatsApiCookie($statsApiCookieName, $submittedKey, $statsApiCookieTtlSeconds);
+    echo json_encode(array(
+        'ok' => true,
+        'action' => 'auth',
+        'acces' => array(
+            'mode' => 'prive',
+            'private_access' => true,
+            'owner' => $matchedOwner,
+            'can_auth' => true
+        )
+    ));
+    exit();
+}
+
+if ($action === 'logout') {
+    clearStatsApiCookie($statsApiCookieName);
+    echo json_encode(array(
+        'ok' => true,
+        'action' => 'logout',
+        'acces' => array(
+            'mode' => 'public',
+            'private_access' => false,
+            'owner' => null,
+            'can_auth' => count($statsApiKeys) > 0
+        )
+    ));
+    exit();
+}
+
+if ($action === 'access') {
+    echo json_encode(array(
+        'ok' => true,
+        'action' => 'access',
+        'acces' => $statsAccess
+    ));
+    exit();
+}
+
 // Réponse d'accueil quand l'API est appelée sans paramètre.
 if (empty($_GET)) {
+    $actions = array('parjour', 'parheure', 'parmois', 'parsemaine', 'tempsreel', 'postes', 'historiqueposte');
+    if ($hasPrivateAccess) {
+        $actions[] = 'utilisateur';
+    }
+
+    $usage = array(
+        '?tempsreel=1',
+        '?postes=1',
+        '?historiqueposte=1&poste=LABOVI1-L-EBSI&date=YYYY-MM-DD',
+        '?parjour=1&datedebut=YYYY-MM-DD&datefin=YYYY-MM-DD',
+        '?parmois=1&session=H|E|A&annee=YYYY',
+        '?parsemaine=1&session=H|E|A&annee=YYYY',
+        '?parheure=1&session=H|E|A&annee=YYYY',
+        '?action=access'
+    );
+    if ($hasPrivateAccess) {
+        $usage[] = '?action=utilisateur&username=nom.utilisateur&page=1';
+    }
+
     echo json_encode(array(
         'ok' => true,
         'message' => 'API statistiques prête.',
-        'actions' => array('parjour', 'parheure', 'parmois', 'parsemaine', 'tempsreel', 'utilisateur'),
-        'usage' => array(
-            '?tempsreel=1',
-            '?parjour=1&datedebut=YYYY-MM-DD&datefin=YYYY-MM-DD',
-            '?parmois=1&session=H|E|A&annee=YYYY',
-            '?parsemaine=1&session=H|E|A&annee=YYYY',
-            '?parheure=1&session=H|E|A&annee=YYYY',
-            '?action=utilisateur&username=nom.utilisateur&page=1'
-        )
+        'actions' => $actions,
+        'usage' => $usage,
+        'acces' => $statsAccess
     ));
     exit();
 }
@@ -127,6 +311,7 @@ if ($action === 'tempsreel') {
         echo json_encode(array(
             'ok' => true,
             'action' => 'tempsreel',
+            'acces' => $statsAccess,
             'parametres' => array(
                 'tablePostes' => $tablePostesName,
                 'tableSessions' => $tableSessionsName,
@@ -143,15 +328,160 @@ if ($action === 'tempsreel') {
                 'postes_occupes_en_ligne' => $occupiedOnline,
                 'taux_occupation_postes_en_ligne' => $occupancyRateOnline
             ),
-            'statuts_postes_en_ligne' => $statutsOnline,
-            'statuts_postes_hors_ligne' => $statutsOffline
+            'donnees' => array(
+                'statuts_postes_en_ligne' => $statutsOnline,
+                'statuts_postes_hors_ligne' => $statutsOffline
+            )
         ));
     } catch (Exception $e) {
-        http_response_code(500);
+        emitErrorResponse(500, 'tempsreel', 'SERVER_ERROR_TEMPSREEL', 'Erreur serveur lors du calcul des statistiques temps réel.');
+    }
+    exit();
+}
+
+if ($action === 'postes') {
+    try {
         echo json_encode(array(
-            'ok' => false,
-            'error' => 'Erreur serveur lors du calcul des statistiques temps réel.'
+            'ok' => true,
+            'action' => 'postes',
+            'acces' => $statsAccess,
+            'parametres' => array(
+                'tablePostes' => $tablePostesName,
+                'tableSessions' => $tableSessionsName
+            ),
+            'donnees' => getSelectablePostes($bdd, $tablePostesName, $tableSessionsName)
         ));
+    } catch (Exception $e) {
+        emitErrorResponse(500, 'postes', 'SERVER_ERROR_POSTES', 'Erreur serveur lors du chargement de la liste des postes.');
+    }
+    exit();
+}
+
+if ($action === 'historiqueposte') {
+    $poste = isset($_GET['poste']) ? trim((string)$_GET['poste']) : '';
+    $dateJour = isset($_GET['date']) ? trim((string)$_GET['date']) : date('Y-m-d');
+
+    if ($poste === '') {
+        emitErrorResponse(400, 'historiqueposte', 'MISSING_POSTE', 'Paramètre poste requis.');
+    }
+
+    $dayDt = DateTime::createFromFormat('Y-m-d', $dateJour);
+    if (!$dayDt || $dayDt->format('Y-m-d') !== $dateJour) {
+        emitErrorResponse(400, 'historiqueposte', 'INVALID_DATE', 'Format de date invalide. Utiliser YYYY-MM-DD.');
+    }
+
+    $dayStart = $dateJour.' 00:00:00';
+    $dayEndExclusive = $dayDt->modify('+1 day')->format('Y-m-d 00:00:00');
+    $dayStartTs = strtotime($dayStart);
+    $dayEndExclusiveTs = strtotime($dayEndExclusive);
+
+    try {
+        $sql = "
+            SELECT
+                id,
+                poste,
+                username,
+                session_type,
+                login,
+                last_seen,
+                logoff,
+                COALESCE(logoff, last_seen, NOW()) AS fin_calculee
+            FROM ".$tableSessionsName."
+            WHERE LOWER(poste) = LOWER(:poste)
+              AND login < :jour_fin_exclusive
+              AND COALESCE(logoff, last_seen, NOW()) >= :jour_debut
+            ORDER BY login ASC, id ASC
+        ";
+
+        $req = $bdd->prepare($sql);
+        $req->execute(array(
+            ':poste' => $poste,
+            ':jour_debut' => $dayStart,
+            ':jour_fin_exclusive' => $dayEndExclusive
+        ));
+        $rows = $req->fetchAll(PDO::FETCH_ASSOC);
+
+        $segments = array();
+        $resume = array(
+            'nb_sessions' => 0,
+            'nb_sessions_console' => 0,
+            'nb_sessions_rdp' => 0,
+            'duree_console_min' => 0.0,
+            'duree_rdp_min' => 0.0
+        );
+
+        foreach ($rows as $row) {
+            $loginTs = strtotime($row['login']);
+            $endTs = strtotime($row['fin_calculee']);
+            if ($loginTs === false || $endTs === false) {
+                continue;
+            }
+
+            $clipStartTs = max($loginTs, $dayStartTs);
+            $clipEndTs = min($endTs, $dayEndExclusiveTs);
+            if ($clipEndTs <= $clipStartTs) {
+                continue;
+            }
+
+            $startMinute = (int)floor(($clipStartTs - $dayStartTs) / 60);
+            $endMinute = (int)ceil(($clipEndTs - $dayStartTs) / 60);
+            if ($startMinute < 0) {
+                $startMinute = 0;
+            }
+            if ($endMinute > 1440) {
+                $endMinute = 1440;
+            }
+            if ($endMinute <= $startMinute) {
+                $endMinute = min(1440, $startMinute + 1);
+            }
+
+            $sessionType = strtolower(trim((string)$row['session_type']));
+            if ($sessionType !== 'rdp') {
+                $sessionType = 'console';
+            }
+
+            $durationMinutes = round(($clipEndTs - $clipStartTs) / 60, 2);
+            $resume['nb_sessions']++;
+            if ($sessionType === 'rdp') {
+                $resume['nb_sessions_rdp']++;
+                $resume['duree_rdp_min'] += $durationMinutes;
+            } else {
+                $resume['nb_sessions_console']++;
+                $resume['duree_console_min'] += $durationMinutes;
+            }
+
+            $segment = array(
+                'id' => (int)$row['id'],
+                'poste' => $row['poste'],
+                'session_type' => $sessionType,
+                'login' => $row['login'],
+                'last_seen' => $row['last_seen'],
+                'logoff' => $row['logoff'],
+                'session_ouverte' => $row['logoff'] === null
+            );
+            if ($hasPrivateAccess) {
+                $segment['username'] = $row['username'];
+            }
+            $segments[] = $segment;
+        }
+
+        $resume['duree_console_min'] = round($resume['duree_console_min'], 2);
+        $resume['duree_rdp_min'] = round($resume['duree_rdp_min'], 2);
+
+        echo json_encode(array(
+            'ok' => true,
+            'action' => 'historiqueposte',
+            'acces' => $statsAccess,
+            'parametres' => array(
+                'poste' => $poste,
+                'date' => $dateJour,
+                'tableSessions' => $tableSessionsName
+            ),
+            'resume' => $resume,
+            'donnees' => $segments
+        ));
+    } catch (Exception $e) {
+        emitErrorResponse(500, 'historiqueposte', 'SERVER_ERROR_HISTORIQUE_POSTE', 'Erreur serveur lors du chargement de l\'historique du poste.');
     }
     exit();
 }
@@ -160,18 +490,17 @@ if ($action === 'tempsreel') {
 // Endpoint utilisateur : sessions d'un username (pagination 25/page)
 // ---------------------------------------------------------------------------
 if ($action === 'utilisateur') {
+    if (!$hasPrivateAccess) {
+        emitErrorResponse(403, 'utilisateur', 'PRIVATE_ACCESS_REQUIRED', 'Endpoint disponible uniquement en mode prive.');
+    }
+
     $username = isset($_GET['username']) ? strtolower(trim($_GET['username'])) : '';
     $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
     if ($page < 1) { $page = 1; }
     $pageSize = 25;
 
     if ($username === '') {
-        http_response_code(400);
-        echo json_encode(array(
-            'ok' => false,
-            'error' => 'Paramètre username requis.'
-        ));
-        exit();
+        emitErrorResponse(400, 'utilisateur', 'MISSING_USERNAME', 'Paramètre username requis.');
     }
 
     try {
@@ -192,8 +521,7 @@ if ($action === 'utilisateur') {
                 username,
                 login,
                 last_seen,
-                logoff,
-                ROUND(GREATEST(TIMESTAMPDIFF(SECOND, login, COALESCE(logoff, last_seen, NOW())), 0) / 60, 2) AS duree_min
+                logoff
             FROM ".$tableSessionsName."
             WHERE LOWER(username) = :username
             ORDER BY login DESC, id DESC
@@ -216,7 +544,6 @@ if ($action === 'utilisateur') {
                 'login' => $row['login'],
                 'last_seen' => $row['last_seen'],
                 'logoff' => $row['logoff'],
-                'duree_min' => (float)$row['duree_min'],
                 'session_ouverte' => $row['logoff'] === null
             );
         }
@@ -224,6 +551,7 @@ if ($action === 'utilisateur') {
         echo json_encode(array(
             'ok' => true,
             'action' => 'utilisateur',
+            'acces' => $statsAccess,
             'parametres' => array(
                 'username' => $username,
                 'page' => $page,
@@ -241,11 +569,7 @@ if ($action === 'utilisateur') {
             'donnees' => $donnees
         ));
     } catch (Exception $e) {
-        http_response_code(500);
-        echo json_encode(array(
-            'ok' => false,
-            'error' => 'Erreur serveur lors du chargement des sessions utilisateur.'
-        ));
+        emitErrorResponse(500, 'utilisateur', 'SERVER_ERROR_UTILISATEUR', 'Erreur serveur lors du chargement des sessions utilisateur.');
     }
     exit();
 }
@@ -275,12 +599,7 @@ if ($sessionParam !== '' && $anneeParam >= 2000 && $anneeParam <= 2100) {
         $datedebut = $anneeParam.'-09-01';
         $datefin   = $anneeParam.'-12-31';
     } else {
-        http_response_code(400);
-        echo json_encode(array(
-            'ok'    => false,
-            'error' => 'Valeur de session invalide. Utiliser H/hiver, E/ete ou A/automne.'
-        ));
-        exit();
+        emitErrorResponse(400, 'validation', 'INVALID_SESSION', 'Valeur de session invalide. Utiliser H/hiver, E/ete ou A/automne.');
     }
     $sessionParam = $sessionNorm;
 } else {
@@ -296,31 +615,16 @@ $isValidDate = function ($value) {
 };
 
 if (!$isValidDate($datedebut) || !$isValidDate($datefin)) {
-    http_response_code(400);
-    echo json_encode(array(
-        'ok' => false,
-        'error' => 'Format de date invalide. Utiliser YYYY-MM-DD.'
-    ));
-    exit();
+    emitErrorResponse(400, 'validation', 'INVALID_DATE', 'Format de date invalide. Utiliser YYYY-MM-DD.');
 }
 
 if ($datedebut > $datefin) {
-    http_response_code(400);
-    echo json_encode(array(
-        'ok' => false,
-        'error' => 'datedebut doit être inférieur ou égal à datefin.'
-    ));
-    exit();
+    emitErrorResponse(400, 'validation', 'INVALID_DATE_RANGE', 'datedebut doit être inférieur ou égal à datefin.');
 }
 
 // Validation explicite des actions statistiques (hors temps réel déjà traité).
 if (($action !== 'parjour') && ($action !== 'parheure') && ($action !== 'parmois') && ($action !== 'parsemaine')) {
-    http_response_code(400);
-    echo json_encode(array(
-        'ok' => false,
-        'error' => 'Action non reconnue. Utiliser ?parjour, ?parheure, ?parmois, ?parsemaine ou ?action=parjour/parheure/parmois/parsemaine.'
-    ));
-    exit();
+    emitErrorResponse(400, $action === '' ? 'unknown' : $action, 'UNKNOWN_ACTION', 'Action non reconnue. Utiliser ?parjour, ?parheure, ?parmois, ?parsemaine ou ?action=parjour/parheure/parmois/parsemaine.');
 }
 
 try {
@@ -397,6 +701,7 @@ try {
         echo json_encode(array(
             'ok' => true,
             'action' => 'parjour',
+            'acces' => $statsAccess,
             'parametres' => array(
                 'datedebut'     => $datedebut,
                 'datefin'       => $datefin,
@@ -464,6 +769,7 @@ try {
         echo json_encode(array(
             'ok' => true,
             'action' => 'parheure',
+            'acces' => $statsAccess,
             'parametres' => array(
                 'datedebut'     => $datedebut,
                 'datefin'       => $datefin,
@@ -538,6 +844,7 @@ try {
         echo json_encode(array(
             'ok' => true,
             'action' => 'parmois',
+            'acces' => $statsAccess,
             'parametres' => array(
                 'datedebut'     => $datedebut,
                 'datefin'       => $datefin,
@@ -610,6 +917,7 @@ try {
         echo json_encode(array(
             'ok' => true,
             'action' => 'parsemaine',
+            'acces' => $statsAccess,
             'parametres' => array(
                 'datedebut'     => $datedebut,
                 'datefin'       => $datefin,
@@ -623,17 +931,8 @@ try {
         break;
 
     default:
-        http_response_code(400);
-        echo json_encode(array(
-            'ok' => false,
-            'error' => 'Action non reconnue. Utiliser ?parjour, ?parheure, ?parmois, ?parsemaine ou ?action=parjour/parheure/parmois/parsemaine.'
-        ));
-        exit();
+        emitErrorResponse(400, $action === '' ? 'unknown' : $action, 'UNKNOWN_ACTION', 'Action non reconnue. Utiliser ?parjour, ?parheure, ?parmois, ?parsemaine ou ?action=parjour/parheure/parmois/parsemaine.');
     }
 } catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(array(
-        'ok' => false,
-        'error' => 'Erreur serveur lors du calcul des statistiques.'
-    ));
+    emitErrorResponse(500, $action === '' ? 'unknown' : $action, 'SERVER_ERROR_STATS', 'Erreur serveur lors du calcul des statistiques.');
 }

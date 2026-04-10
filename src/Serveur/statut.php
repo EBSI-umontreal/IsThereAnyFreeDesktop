@@ -4,6 +4,10 @@ require_once('LAB_config.php');
 $poste   = strtolower($_GET['poste']);
 $statut  = strtolower($_GET['statut']);
 $username = isset($_GET['username']) ? strtolower(trim($_GET['username'])) : '';
+$session_type = isset($_GET['session_type']) ? strtolower(trim($_GET['session_type'])) : 'console';
+if (!in_array($session_type, array('console', 'rdp'))) {
+	$session_type = 'console';
+}
 
 switch ($statut) {
 	case "dispo":
@@ -32,11 +36,11 @@ switch ($statut) {
 					$session = $req->fetch();
 
 					if ($session) {
-						$bdd->prepare("UPDATE $tableSessions SET last_seen=NOW() WHERE id=:id")
-							->execute([':id' => $session['id']]);
+						$bdd->prepare("UPDATE $tableSessions SET last_seen=NOW(), session_type=:session_type WHERE id=:id")
+							->execute([':id' => $session['id'], ':session_type' => $session_type]);
 					} else {
-						$bdd->prepare("INSERT INTO $tableSessions (poste, username, login, last_seen, logoff) VALUES (:poste, :username, NOW(), NOW(), NULL)")
-							->execute([':poste' => $poste, ':username' => $username]);
+						$bdd->prepare("INSERT INTO $tableSessions (poste, username, login, last_seen, logoff, session_type) VALUES (:poste, :username, NOW(), NOW(), NULL, :session_type)")
+							->execute([':poste' => $poste, ':username' => $username, ':session_type' => $session_type]);
 					}
 				} else {
 					// Poste libre ou nordp sans username : fermer les sessions ouvertes
