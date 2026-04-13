@@ -4,7 +4,7 @@ setlocal enableExtensions enableDelayedExpansion
 set fileLog=C:\Windows\Temp\IsThereAnyFreeDesktop.log
 set fileShutdown=C:\Windows\Temp\IsThereAnyFreeDesktop_shutdown.txt
 REM debug: 1 = activer logs détaillés, 0 = désactiver
-set debug=
+set debug=0
 
 set ServerURL=https://laboratoires.fas.umontreal.ca/ebsi/statut.php
 

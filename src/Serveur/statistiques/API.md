@@ -1,4 +1,4 @@
-# API statistiques
+﻿# API statistiques
 
 Documentation du module de statistiques JSON de `IsThereAnyFreeDesktop`.
 
@@ -54,8 +54,6 @@ Configuration recommandée dans Postman :
 - Méthode : `GET`
 - Header : `Accept: application/json`
 - Base URL (exemple) : `https://votresiteweb.com/IsThereAnyFreeDesktop/statistiques/api.php`
-
-Tu peux créer une collection "Statistiques API" avec ces requêtes :
 
 ### 1) Ping API (sans paramètre)
 

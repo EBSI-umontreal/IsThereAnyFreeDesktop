@@ -46,7 +46,7 @@ $defaultAnnee = date('Y');
 </head>
 <body>
     <div class="zone-graphe access-panel">
-        <h2>Mode d'acces aux donnees sensibles</h2>
+        <h2>Mode d'accès aux données sensibles</h2>
         <div class="access-row">
             <div id="accessStatus" class="access-status">Mode public (anonyme)</div>
             <label>Cle API

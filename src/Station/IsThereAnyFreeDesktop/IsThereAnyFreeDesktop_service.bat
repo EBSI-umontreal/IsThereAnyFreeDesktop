@@ -4,7 +4,7 @@ setlocal enableExtensions enableDelayedExpansion
 set fileLog=C:\Windows\Temp\IsThereAnyFreeDesktop.log
 set fileShutdown=C:\Windows\Temp\IsThereAnyFreeDesktop_shutdown.txt
 REM debug: 1 = activer logs détaillés, 0 = désactiver
-set debug=
+set debug=0
 
 REM Configuration du groupe RDP: utiliser RDPLocalGroup OU RDPLocalGroupSID
 REM Si RDPLocalGroup est défini, il sera prioritaire. Sinon, on utilise RDPLocalGroupSID
@@ -69,7 +69,7 @@ if %debug%==1 call :ScreenAndLog "MAIN - Groupe RDP local resolu : %RDPLocalGrou
 	REM 2.1 Déterminer le jour (lundi, mardi, etc.)
 	REM https://serverfault.com/questions/94824/finding-day-of-week-in-batch-file-windows-server-2008
 	set "dayNumber="
-	for /f %%a in ('powershell -Command "(Get-Date).DayOfWeek.value__"') do set dayNumber=%%a
+	for /f %%a in ('powershell -Command "$d = (Get-Date).DayOfWeek.value__; if ($d -eq 0) { 7 } else { $d }"') do set dayNumber=%%a
 	REM call set dayNumber=7
 	REM Déterminer l'heure et comparer avec l'heure du service
 	call set startRDPTime=%%startRDPTime[%dayNumber%]%%

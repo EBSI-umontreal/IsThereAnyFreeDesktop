@@ -3,7 +3,6 @@
 setlocal enableExtensions enableDelayedExpansion
 set fileLog=C:\Windows\Temp\IsThereAnyFreeDesktop.log
 set fileShutdown=C:\Windows\Temp\IsThereAnyFreeDesktop_shutdown.txt
-set debug=
 
 
 :check_Permissions
