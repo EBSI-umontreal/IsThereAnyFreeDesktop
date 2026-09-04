@@ -1,5 +1,7 @@
 let chart;
 let hoursChart;
+let todayHoursChart;
+let selectedDayHoursChart;
 let monthsChart;
 let weekdayChart;
 let cmpDayChart;
@@ -613,6 +615,7 @@ async function chargerHistoriquePoste() {
     setErreurHistorique('');
 
     const url = 'api.php?historiqueposte=1&poste=' + encodeURIComponent(poste) + '&date=' + encodeURIComponent(date);
+    setApiRequest('history', url);
     const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
     const data = await response.json();
 
@@ -625,6 +628,23 @@ async function chargerHistoriquePoste() {
     renderHistoryTimeline(data);
     setTableHistorique(enrichHistoryRows(data));
     setJsonView('jsonHistorySessions', data);
+}
+
+function deplacerJourHistorique(delta) {
+    const input = document.getElementById('historyDate');
+    if (!input || !input.value) {
+        return;
+    }
+
+    const parts = input.value.split('-').map(Number);
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    date.setDate(date.getDate() + delta);
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    input.value = year + '-' + month + '-' + day;
+    chargerHistoriquePoste();
 }
 
 /**
@@ -646,6 +666,13 @@ async function initialiserHistoriquePoste() {
             chargerHistoriquePoste();
         });
     }
+
+    document.getElementById('btnHistoryPrev').addEventListener('click', function () {
+        deplacerJourHistorique(-1);
+    });
+    document.getElementById('btnHistoryNext').addEventListener('click', function () {
+        deplacerJourHistorique(1);
+    });
 
     if (loaded && posteEl && posteEl.value) {
         chargerHistoriquePoste();
@@ -714,6 +741,42 @@ function setCards(resume) {
     document.getElementById('c_duree_moy_min').textContent = resume.duree_moyenne_ponderee_min;
 }
 
+function getTodayIsoDate() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return year + '-' + month + '-' + day;
+}
+
+function setDayCards(payload, prefix) {
+    const resume = payload.resume || {};
+    document.getElementById(prefix + '_nb_sessions').textContent = resume.nb_sessions_total != null
+        ? resume.nb_sessions_total
+        : '-';
+    document.getElementById(prefix + '_duree_totale_h').textContent = resume.duree_totale_heures != null
+        ? resume.duree_totale_heures
+        : '-';
+    document.getElementById(prefix + '_duree_moy_min').textContent = resume.duree_moyenne_ponderee_min != null
+        ? resume.duree_moyenne_ponderee_min
+        : '-';
+    const occupancyEl = document.getElementById(prefix + '_taux_occupation_24h');
+    if (occupancyEl) {
+        const capacityHours = Number(resume.nb_postes || 0) * 24;
+        const totalSessionHours = Number(resume.duree_totale_heures || 0);
+        occupancyEl.textContent = capacityHours > 0
+            ? (totalSessionHours / capacityHours * 100).toFixed(2) + ' %'
+            : '-';
+    }
+
+    const asof = (payload.parametres && payload.parametres.datefin) ? payload.parametres.datefin : getTodayIsoDate();
+    document.getElementById(prefix + '_asof').textContent = 'Période : ' + asof;
+}
+
+function setTodayCards(payload) {
+    setDayCards(payload, 'td');
+}
+
 /**
  * Met à jour la section de portrait en direct.
  * @param {{resume:Object, statuts_postes_en_ligne:Object, parametres:Object}} payload
@@ -736,10 +799,6 @@ function setRealtime(payload) {
     document.getElementById('rt_taux_occupation').textContent = resume.taux_occupation_postes_en_ligne != null
         ? String(resume.taux_occupation_postes_en_ligne) + ' %'
         : '-';
-    document.getElementById('rt_sessions_hors_ligne').textContent = resume.sessions_ouvertes_sur_postes_hors_ligne != null
-        ? resume.sessions_ouvertes_sur_postes_hors_ligne
-        : '-';
-
     const ul = document.getElementById('rt_statuts');
     ul.innerHTML = '';
     const statuts = donnees.statuts_postes_en_ligne || payload.statuts_postes_en_ligne || {};
@@ -776,6 +835,38 @@ function setRealtime(payload) {
     document.getElementById('rt_asof').textContent = asof ? ('Dernière mise à jour : ' + asof) : '';
 }
 
+function setRealtimeTable(payload) {
+    const resume = payload.resume || {};
+    const donnees = payload.donnees || {};
+    const rows = [
+        { indicateur: 'Postes total', valeur: resume.postes_total },
+        { indicateur: 'Postes en ligne', valeur: resume.postes_en_ligne },
+        { indicateur: 'Postes hors ligne', valeur: resume.postes_hors_ligne },
+        { indicateur: 'Sessions ouvertes', valeur: resume.sessions_ouvertes },
+        { indicateur: 'Postes occupés en ligne', valeur: resume.postes_occupes_en_ligne },
+        { indicateur: 'Taux occupation (postes en ligne)', valeur: resume.taux_occupation_postes_en_ligne != null ? resume.taux_occupation_postes_en_ligne + ' %' : null }
+    ];
+    const statuses = [
+        { groupe: 'Postes en ligne', valeurs: donnees.statuts_postes_en_ligne || payload.statuts_postes_en_ligne || {} },
+        { groupe: 'Postes hors ligne', valeurs: donnees.statuts_postes_hors_ligne || payload.statuts_postes_hors_ligne || {} }
+    ];
+
+    statuses.forEach(function (statusGroup) {
+        Object.keys(statusGroup.valeurs).forEach(function (statut) {
+            rows.push({
+                indicateur: statusGroup.groupe + ' : ' + statut,
+                valeur: statusGroup.valeurs[statut]
+            });
+        });
+    });
+
+    setRowsTable('tbodyRealtime', rows, [
+        { key: 'indicateur' },
+        { key: 'valeur' }
+    ]);
+    setJsonView('jsonRealtime', payload);
+}
+
 /**
  * Charge les données temps réel.
  */
@@ -787,6 +878,69 @@ async function chargerTempsReel() {
         return;
     }
     setRealtime(data);
+    setRealtimeTable(data);
+}
+
+async function chargerJour(date, prefix, tableId, jsonId, canvasId, chartName) {
+    const params = 'datedebut=' + encodeURIComponent(date) + '&datefin=' + encodeURIComponent(date);
+    const apiKey = chartName === 'today' ? 'today-hours' : 'selected-day-hours';
+    setApiRequest(apiKey, 'api.php?parheure=1&' + params);
+    const responses = await Promise.all([
+        fetch('api.php?parjour=1&' + params, { headers: { 'Accept': 'application/json' } }),
+        fetch('api.php?parheure=1&' + params, { headers: { 'Accept': 'application/json' } })
+    ]);
+    const data = await responses[0].json();
+    const dataParHeure = await responses[1].json();
+    if (!responses[0].ok || !data.ok) {
+        setErreur((data && data.error) ? data.error : 'Erreur lors du chargement des statistiques de la journée sélectionnée.');
+        return;
+    }
+    if (!responses[1].ok || !dataParHeure.ok) {
+        setErreur((dataParHeure && dataParHeure.error) ? dataParHeure.error : 'Erreur lors du chargement des statistiques horaires de la journée sélectionnée.');
+        return;
+    }
+    if (chartName === 'today') {
+        setTodayCards(data);
+    } else {
+        setDayCards(data, prefix);
+    }
+    setRowsTable(tableId, dataParHeure.donnees, [
+        { key: 'heure' },
+        { key: 'nb_sessions' },
+        { key: 'duree_moyenne_min' },
+        { key: 'duree_totale_h' }
+    ]);
+    setJsonView(jsonId, dataParHeure.donnees);
+    setHoursChart(dataParHeure.donnees, canvasId, chartName);
+}
+
+async function chargerAujourdhui() {
+    await chargerJour(getTodayIsoDate(), 'td', 'tbodyTodayStatsHour', 'jsonTodayStatsHour', 'todayHoursChart', 'today');
+}
+
+async function chargerJourSelectionne() {
+    const date = document.getElementById('selectedDayDate').value;
+    if (!date) {
+        return;
+    }
+    await chargerJour(date, 'sd', 'tbodySelectedDayStatsHour', 'jsonSelectedDayStatsHour', 'selectedDayHoursChart', 'selectedDay');
+}
+
+function deplacerJourSelectionne(delta) {
+    const input = document.getElementById('selectedDayDate');
+    if (!input || !input.value) {
+        return;
+    }
+
+    const parts = input.value.split('-').map(Number);
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    date.setDate(date.getDate() + delta);
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    input.value = year + '-' + month + '-' + day;
+    chargerJourSelectionne();
 }
 
 /**
@@ -941,6 +1095,124 @@ function initTabs() {
     });
 }
 
+function initApiCopyButtons() {
+    document.querySelectorAll('.api-copy-btn').forEach(function (button) {
+        button.addEventListener('click', async function () {
+            const target = document.getElementById(button.getAttribute('data-copy-target'));
+            const status = document.getElementById(button.getAttribute('data-copy-target').replace('Request', 'CopyStatus'));
+            if (!target || !navigator.clipboard) { return; }
+
+            await navigator.clipboard.writeText(target.textContent);
+            if (status) {
+                status.textContent = 'Requête copiée.';
+                setTimeout(function () { status.textContent = ''; }, 2000);
+            }
+        });
+    });
+}
+
+function initApiDataTabs() {
+    const apiViews = [
+        { canvasId: 'todayHoursChart', key: 'today-hours', query: 'api.php?parheure=1&datedebut=YYYY-MM-DD&datefin=YYYY-MM-DD' },
+        { canvasId: 'selectedDayHoursChart', key: 'selected-day-hours', query: 'api.php?parheure=1&datedebut=YYYY-MM-DD&datefin=YYYY-MM-DD' },
+        { canvasId: 'statsChart', key: 'stats-day', query: 'api.php?parjour=1&session=H&annee=YYYY' },
+        { canvasId: 'monthsChart', key: 'stats-month', query: 'api.php?parmois=1&session=H&annee=YYYY' },
+        { canvasId: 'weekdayChart', key: 'stats-weekday', query: 'api.php?parsemaine=1&session=H&annee=YYYY' },
+        { canvasId: 'hoursChart', key: 'stats-hour', query: 'api.php?parheure=1&session=H&annee=YYYY' },
+        { groupSelector: '.stats-tabs-history', key: 'history', query: 'api.php?historiqueposte=1&poste=POSTE&date=YYYY-MM-DD' }
+    ];
+
+    apiViews.forEach(function (view) {
+        const canvas = document.getElementById(view.canvasId);
+        const group = view.groupSelector
+            ? document.querySelector(view.groupSelector)
+            : (canvas ? canvas.closest('.stats-tabs') : null);
+        if (!group || group.querySelector('[data-panel="api"]')) { return; }
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'tab-btn';
+        button.setAttribute('data-tab', 'api');
+        button.textContent = 'API';
+        group.querySelector('.tabs-nav').appendChild(button);
+
+        const panel = document.createElement('div');
+        panel.className = 'tab-panel';
+        panel.setAttribute('data-panel', 'api');
+        panel.innerHTML = '<div class="api-request">' +
+            '<div class="api-request-label">Requête HTTP utilisée</div>' +
+            '<code id="apiRequest-' + view.key + '">' + view.query + '</code>' +
+            '<button type="button" class="api-copy-btn" data-copy-target="apiRequest-' + view.key + '">Copier la requête</button>' +
+            '<button type="button" class="api-open-btn" data-api-url="' + view.query + '">Ouvrir dans un onglet</button>' +
+            '<small id="apiCopyStatus-' + view.key + '" class="api-copy-status" aria-live="polite"></small>' +
+            '</div>';
+        group.appendChild(panel);
+    });
+}
+
+function setApiRequest(key, query) {
+    const code = document.getElementById('apiRequest-' + key);
+    if (code) {
+        code.textContent = query;
+    }
+    const copyButton = document.querySelector('[data-copy-target="apiRequest-' + key + '"]');
+    if (copyButton) {
+        copyButton.setAttribute('data-copy-target', 'apiRequest-' + key);
+    }
+    const openButton = document.querySelector('[data-api-url][data-api-key="' + key + '"]') ||
+        (code ? code.parentElement.querySelector('.api-open-btn') : null);
+    if (openButton) {
+        openButton.setAttribute('data-api-url', query);
+    }
+}
+
+function initApiOpenButtons() {
+    document.querySelectorAll('.api-open-btn').forEach(function (button) {
+        button.addEventListener('click', function () {
+            const url = button.getAttribute('data-api-url');
+            if (url) {
+                window.open(url, '_blank', 'noopener');
+            }
+        });
+    });
+}
+
+function initStatsNavigation() {
+    const links = Array.from(document.querySelectorAll('.stats-nav-link'));
+    const sections = links
+        .map(function (link) {
+            return document.querySelector(link.getAttribute('href'));
+        })
+        .filter(Boolean);
+
+    function setActiveSection(sectionId) {
+        links.forEach(function (link) {
+            link.classList.toggle('is-active', link.getAttribute('href') === '#' + sectionId);
+        });
+    }
+
+    links.forEach(function (link) {
+        link.addEventListener('click', function (event) {
+            const section = document.querySelector(link.getAttribute('href'));
+            if (!section) { return; }
+            event.preventDefault();
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setActiveSection(section.id);
+        });
+    });
+
+    if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (entry.isIntersecting) {
+                    setActiveSection(entry.target.id);
+                }
+            });
+        }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
+        sections.forEach(function (section) { observer.observe(section); });
+    }
+}
+
 /**
  * Construit le graphique principal par jour.
  * On combine un histogramme (nombre de sessions) et une courbe (durée moyenne).
@@ -995,17 +1267,22 @@ function setChart(rows) {
  * Les 24 heures sont affichées, même si certaines n'ont aucune session.
  * @param {Array<{heure:string, nb_sessions:number, duree_moyenne_min:number}>} rows
  */
-function setHoursChart(rows) {
+function setHoursChart(rows, canvasId, chartName) {
+    canvasId = canvasId || 'hoursChart';
+    chartName = chartName || 'history';
     const labels = rows.map(function (r) { return r.heure; });
     const sessions = rows.map(function (r) { return r.nb_sessions; });
     const dureeMoy = rows.map(function (r) { return r.duree_moyenne_min; });
 
-    if (hoursChart) {
-        hoursChart.destroy();
+    const previousChart = chartName === 'today'
+        ? todayHoursChart
+        : (chartName === 'selectedDay' ? selectedDayHoursChart : hoursChart);
+    if (previousChart) {
+        previousChart.destroy();
     }
 
-    const ctx = document.getElementById('hoursChart').getContext('2d');
-    hoursChart = new Chart(ctx, {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const newChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
@@ -1037,6 +1314,13 @@ function setHoursChart(rows) {
             }
         }
     });
+    if (chartName === 'today') {
+        todayHoursChart = newChart;
+    } else if (chartName === 'selectedDay') {
+        selectedDayHoursChart = newChart;
+    } else {
+        hoursChart = newChart;
+    }
 }
 
 /**
@@ -1307,6 +1591,14 @@ function dayLabelFromKey(mmdd) {
     return day + '/' + month;
 }
 
+function dayLabelFromIsoDate(isoDate) {
+    const parts = String(isoDate || '').split('-');
+    if (parts.length !== 3) {
+        return String(isoDate || '');
+    }
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+}
+
 /**
  * Construit le graphique comparatif par jour.
  */
@@ -1373,18 +1665,18 @@ function setComparisonDayChart(seriesList, overlayBySession) {
         const keySet = new Set();
         seriesList.forEach(function (serie) {
             serie.parjour.forEach(function (row) {
-                keySet.add(dayKeyFromIsoDate(row.jour));
+                keySet.add(String(row.jour));
             });
         });
 
         const dayKeys = Array.from(keySet).sort();
-        labels = dayKeys.map(dayLabelFromKey);
+        labels = dayKeys.map(dayLabelFromIsoDate);
 
         datasets = seriesList.map(function (serie, index) {
             const color = SET1_PALETTE[index % SET1_PALETTE.length];
             const values = {};
             serie.parjour.forEach(function (row) {
-                values[dayKeyFromIsoDate(row.jour)] = row.nb_sessions;
+                values[String(row.jour)] = row.nb_sessions;
             });
 
             return {
@@ -1413,9 +1705,9 @@ function setComparisonDayChart(seriesList, overlayBySession) {
 }
 
 /**
- * Construit le graphique comparatif par mois.
+ * Construit le graphique comparatif par mois (toujours regroupé par indice de session).
  */
-function setComparisonMonthChart(seriesList, overlayBySession) {
+function setComparisonMonthChart(seriesList) {
     let labels = [];
     let datasets = [];
     let chartOptions = {
@@ -1426,78 +1718,50 @@ function setComparisonMonthChart(seriesList, overlayBySession) {
         }
     };
 
-    if (overlayBySession) {
-        let maxLen = 0;
-        seriesList.forEach(function (serie) {
-            if (serie.parmois.length > maxLen) {
-                maxLen = serie.parmois.length;
-            }
-        });
-        labels = Array.from({ length: maxLen }, function (_, idx) {
-            return 'Mois ' + (idx + 1);
-        });
+    let maxLen = 0;
+    seriesList.forEach(function (serie) {
+        if (serie.parmois.length > maxLen) {
+            maxLen = serie.parmois.length;
+        }
+    });
+    labels = Array.from({ length: maxLen }, function (_, idx) {
+        return 'Mois ' + (idx + 1);
+    });
 
-        datasets = seriesList.map(function (serie, index) {
-            const color = SET1_PALETTE[index % SET1_PALETTE.length];
-            const values = Array.from({ length: maxLen }, function (_, idx) {
-                return (serie.parmois[idx] && typeof serie.parmois[idx].nb_sessions === 'number')
-                    ? serie.parmois[idx].nb_sessions
-                    : 0;
-            });
-            const realMonths = Array.from({ length: maxLen }, function (_, idx) {
-                return (serie.parmois[idx] && serie.parmois[idx].mois) ? serie.parmois[idx].mois : '';
-            });
-
-            return {
-                type: 'bar',
-                label: serie.label,
-                data: values,
-                realMonths: realMonths,
-                backgroundColor: hexToRgba(color, 0.5),
-                borderColor: color,
-                borderWidth: 1
-            };
+    datasets = seriesList.map(function (serie, index) {
+        const color = SET1_PALETTE[index % SET1_PALETTE.length];
+        const values = Array.from({ length: maxLen }, function (_, idx) {
+            return (serie.parmois[idx] && typeof serie.parmois[idx].nb_sessions === 'number')
+                ? serie.parmois[idx].nb_sessions
+                : 0;
+        });
+        const realMonths = Array.from({ length: maxLen }, function (_, idx) {
+            return (serie.parmois[idx] && serie.parmois[idx].mois) ? serie.parmois[idx].mois : '';
         });
 
-        chartOptions.plugins = {
-            tooltip: {
-                callbacks: {
-                    afterLabel: function (context) {
-                        const ds = context.dataset || {};
-                        const idx = context.dataIndex;
-                        const realMonth = ds.realMonths && ds.realMonths[idx] ? ds.realMonths[idx] : '';
-                        return realMonth ? ('Mois réel: ' + realMonth) : '';
-                    }
+        return {
+            type: 'bar',
+            label: serie.label,
+            data: values,
+            realMonths: realMonths,
+            backgroundColor: hexToRgba(color, 0.5),
+            borderColor: color,
+            borderWidth: 1
+        };
+    });
+
+    chartOptions.plugins = {
+        tooltip: {
+            callbacks: {
+                afterLabel: function (context) {
+                    const ds = context.dataset || {};
+                    const idx = context.dataIndex;
+                    const realMonth = ds.realMonths && ds.realMonths[idx] ? ds.realMonths[idx] : '';
+                    return realMonth ? ('Mois réel: ' + realMonth) : '';
                 }
             }
-        };
-    } else {
-        const monthKeys = new Set();
-        seriesList.forEach(function (serie) {
-            serie.parmois.forEach(function (row) {
-                monthKeys.add(row.mois);
-            });
-        });
-
-        labels = Array.from(monthKeys).sort();
-
-        datasets = seriesList.map(function (serie, index) {
-            const color = SET1_PALETTE[index % SET1_PALETTE.length];
-            const values = {};
-            serie.parmois.forEach(function (row) {
-                values[row.mois] = row.nb_sessions;
-            });
-
-            return {
-                type: 'bar',
-                label: serie.label,
-                data: labels.map(function (monthKey) { return values[monthKey] || 0; }),
-                backgroundColor: hexToRgba(color, 0.5),
-                borderColor: color,
-                borderWidth: 1
-            };
-        });
-    }
+        }
+    };
 
     if (cmpMonthChart) {
         cmpMonthChart.destroy();
@@ -1597,7 +1861,7 @@ async function chargerComparaison() {
     });
 
     setComparisonDayChart(seriesList, overlayBySession);
-    setComparisonMonthChart(seriesList, overlayBySession);
+    setComparisonMonthChart(seriesList);
     setComparisonWeekdayChart(seriesList);
 
     const pairValues = pairs.map(function (p) { return p.session + ':' + p.year; });
@@ -1640,6 +1904,9 @@ function initialiserComparaison() {
     const savedOverlay = getCookie('stats_cmp_overlay');
     if (overlayEl) {
         overlayEl.checked = (savedOverlay === '1');
+        overlayEl.addEventListener('change', function () {
+            chargerComparaison();
+        });
     }
 
     document.getElementById('btnComparerSessions').addEventListener('click', function () {
@@ -1770,7 +2037,7 @@ function getApiParams() {
 async function charger() {
     setErreur('');
 
-    await chargerTempsReel();
+    await Promise.all([chargerTempsReel(), chargerAujourdhui(), chargerJourSelectionne()]);
 
     const apiParams = getApiParams();
     if (!apiParams) {
@@ -1788,6 +2055,11 @@ async function charger() {
     const urlParMois  = 'api.php?parmois=1&'  + params;
     const urlParSemaine = 'api.php?parsemaine=1&' + params;
     const urlParHeure = 'api.php?parheure=1&' + params;
+
+    setApiRequest('stats-day', urlParJour);
+    setApiRequest('stats-month', urlParMois);
+    setApiRequest('stats-weekday', urlParSemaine);
+    setApiRequest('stats-hour', urlParHeure);
 
     const responses = await Promise.all([
         fetch(urlParJour,  { headers: { 'Accept': 'application/json' } }),
@@ -1847,7 +2119,11 @@ async function initialiserApplication() {
     applierModeActif(modeInitial);
 
     // 2b. Initialiser les onglets Graphique / Tableau / JSON
+    initApiDataTabs();
     initTabs();
+    initApiCopyButtons();
+    initApiOpenButtons();
+    initStatsNavigation();
 
     // 2c. Charger l'etat d'acces public/prive
     await refreshAccessState();
@@ -1886,6 +2162,18 @@ async function initialiserApplication() {
             }
         });
     }
+
+    // 4a bis. Journée sélectionnée
+    const selectedDayDate = document.getElementById('selectedDayDate');
+    if (selectedDayDate) {
+        selectedDayDate.addEventListener('change', chargerJourSelectionne);
+    }
+    document.getElementById('btnSelectedDayPrev').addEventListener('click', function () {
+        deplacerJourSelectionne(-1);
+    });
+    document.getElementById('btnSelectedDayNext').addEventListener('click', function () {
+        deplacerJourSelectionne(1);
+    });
 
     // 4b. Sessions par utilisateur
     document.getElementById('btnUserLoad').addEventListener('click', function () {
@@ -1944,6 +2232,7 @@ async function initialiserApplication() {
     }
     liveRefreshTimer = setInterval(function () {
         chargerTempsReel();
+        chargerAujourdhui();
     }, 30000);
 }
 

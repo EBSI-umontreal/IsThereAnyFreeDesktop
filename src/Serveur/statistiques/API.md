@@ -290,6 +290,7 @@ GET api.php?parjour=1&session=H&annee=2026
   },
   "resume": {
     "nb_jours": 31,
+    "nb_postes": 60,
     "nb_sessions_total": 1234,
     "duree_totale_heures": 567.89,
     "duree_moyenne_ponderee_min": 27.61
@@ -445,7 +446,6 @@ GET api.php?tempsreel=1
     "postes_hors_ligne": 12,
     "sessions_ouvertes": 33,
     "postes_distincts_avec_session_ouverte": 30,
-    "sessions_ouvertes_sur_postes_hors_ligne": 2,
     "postes_occupes_en_ligne": 26,
     "taux_occupation_postes_en_ligne": 54.17
   },
@@ -466,7 +466,6 @@ GET api.php?tempsreel=1
 
 Notes :
 - Un poste est considéré **en ligne** si `last_seen` est dans la fenêtre `heartbeatTimeoutSeconds`.
-- `sessions_ouvertes_sur_postes_hors_ligne` aide à détecter les sessions « orphelines ».
 
 ## Réponse par défaut (aucun paramètre)
 

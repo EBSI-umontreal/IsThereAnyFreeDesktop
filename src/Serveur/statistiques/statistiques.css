@@ -5,6 +5,11 @@
  * Usage CSS : var(--set1-rouge), var(--set1-bleu), ...
  */
 :root {
+    --udem-blue:       #00549e;
+    --udem-blue-dark:  #003b70;
+    --udem-blue-light: #e8f2fb;
+    --udem-blue-line:  #2f83c5;
+
     --set1-rouge:  #e41a1c;
     --set1-bleu:   #377eb8;
     --set1-vert:   #4daf4a;
@@ -27,6 +32,134 @@
     --access-public-border: #d0a243;
     --access-private-bg: #eaf8ef;
     --access-private-border: #4daf4a;
+}
+
+/* ------------------------------------------------
+ * Navigation principale
+ * ------------------------------------------------ */
+.stats-layout {
+    display: grid;
+    grid-template-columns: 230px minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+}
+
+.stats-sidebar {
+    position: sticky;
+    top: 20px;
+    min-height: calc(100vh - 40px);
+    box-sizing: border-box;
+    padding: 22px 14px;
+    border-radius: 10px;
+    background: linear-gradient(160deg, var(--udem-blue-dark), var(--udem-blue));
+    box-shadow: 0 8px 24px rgba(0, 59, 112, 0.18);
+    color: #fff;
+}
+
+.stats-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 12px 22px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.24);
+}
+
+.stats-brand-mark {
+    font-size: 25px;
+    font-weight: bold;
+    letter-spacing: 0.02em;
+}
+
+.stats-brand-title {
+    font-size: 13px;
+    opacity: 0.82;
+}
+
+.stats-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 18px;
+}
+
+.stats-nav-link {
+    display: block;
+    padding: 10px 12px;
+    border-left: 3px solid transparent;
+    border-radius: 0 6px 6px 0;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 14px;
+    line-height: 1.25;
+    text-decoration: none;
+    transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.stats-nav-link:hover,
+.stats-nav-link:focus-visible,
+.stats-nav-link.is-active {
+    border-left-color: #fff;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    outline: none;
+}
+
+.stats-main {
+    min-width: 0;
+}
+
+.stats-main > h1 {
+    scroll-margin-top: 20px;
+}
+
+@media (max-width: 800px) {
+    .stats-layout {
+        display: block;
+    }
+
+    .stats-sidebar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        min-height: 0;
+        margin-bottom: 20px;
+        padding: 12px;
+        border-radius: 0 0 10px 10px;
+    }
+
+    .stats-brand {
+        flex-direction: row;
+        align-items: baseline;
+        gap: 8px;
+        padding: 0 4px 10px;
+    }
+
+    .stats-brand-mark {
+        font-size: 20px;
+    }
+
+    .stats-nav {
+        flex-direction: row;
+        gap: 6px;
+        margin-top: 10px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+    }
+
+    .stats-nav-link {
+        flex: 0 0 auto;
+        padding: 8px 10px;
+        border-left: 0;
+        border-bottom: 3px solid transparent;
+        border-radius: 5px;
+        white-space: nowrap;
+    }
+
+    .stats-nav-link:hover,
+    .stats-nav-link:focus-visible,
+    .stats-nav-link.is-active {
+        border-bottom-color: #fff;
+        border-left-color: transparent;
+    }
 }
 
 /* ------------------------------------------------
@@ -166,6 +299,50 @@
 .stats-tabs {
     margin-top: 8px;
     --stats-panel-height: 480px;
+}
+
+.stats-tabs-realtime {
+    --stats-panel-height: auto;
+}
+
+.api-request {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fafafa;
+}
+
+.api-request-label {
+    flex-basis: 100%;
+    color: #555;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.api-request code {
+    flex: 1 1 280px;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f2f2f2;
+    color: #222;
+    overflow-wrap: anywhere;
+}
+
+.api-copy-btn {
+    padding: 8px 12px;
+}
+
+.api-open-btn {
+    padding: 8px 12px;
+}
+
+.api-copy-status {
+    color: #555;
 }
 
 .stats-tabs-history {

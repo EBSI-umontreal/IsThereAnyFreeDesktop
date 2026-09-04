@@ -66,7 +66,7 @@ function getSelectablePostes($bdd, $tablePostesName, $tableSessionsName)
     $postes = array();
 
     try {
-        $reqPostes = $bdd->prepare("SELECT poste FROM ".$tablePostesName." WHERE ((poste LIKE 'LABOVI%') OR (reserve IS NOT NULL)) AND poste IS NOT NULL AND TRIM(poste) <> '' ORDER BY poste");
+        $reqPostes = $bdd->prepare("SELECT poste FROM ".$tablePostesName." WHERE poste IS NOT NULL AND TRIM(poste) <> '' ORDER BY poste");
         $reqPostes->execute();
         $rows = $reqPostes->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as $row) {
@@ -248,7 +248,7 @@ if (empty($_GET)) {
 // ---------------------------------------------------------------------------
 if ($action === 'tempsreel') {
     try {
-        $reqPostes = $bdd->prepare("SELECT poste, statut, last_seen FROM ".$tablePostesName." WHERE (poste LIKE 'LABOVI%') OR (reserve IS NOT NULL) ORDER BY poste");
+        $reqPostes = $bdd->prepare("SELECT poste, statut, last_seen FROM ".$tablePostesName." WHERE poste IS NOT NULL AND TRIM(poste) <> '' ORDER BY poste");
         $reqPostes->execute();
         $postes = $reqPostes->fetchAll(PDO::FETCH_ASSOC);
 
@@ -257,7 +257,7 @@ if ($action === 'tempsreel') {
         $offlineTotal = 0;
         $statutsOnline = array();
         $statutsOffline = array();
-        $onlinePostesSet = array();
+        $onlinePostesStatut = array();
         $nowTs = time();
 
         foreach ($postes as $poste) {
@@ -273,7 +273,7 @@ if ($action === 'tempsreel') {
 
             if ($isOnline) {
                 $onlineTotal++;
-                $onlinePostesSet[strtolower($poste['poste'])] = true;
+                $onlinePostesStatut[strtolower($poste['poste'])] = $statut;
                 if (!isset($statutsOnline[$statut])) {
                     $statutsOnline[$statut] = 0;
                 }
@@ -295,17 +295,21 @@ if ($action === 'tempsreel') {
         $openSessionsRows = $reqSessions->fetchAll(PDO::FETCH_ASSOC);
 
         $openSessionsTotal = count($openSessionsRows);
-        $openSessionsOnOfflinePostes = 0;
         $openSessionsDistinctPostes = array();
         foreach ($openSessionsRows as $session) {
             $posteKey = strtolower((string)$session['poste']);
             $openSessionsDistinctPostes[$posteKey] = true;
-            if (!isset($onlinePostesSet[$posteKey])) {
-                $openSessionsOnOfflinePostes++;
-            }
         }
 
         $occupiedOnline = isset($statutsOnline['oqp']) ? (int)$statutsOnline['oqp'] : 0;
+        $nordpAvecSession = array();
+        foreach ($openSessionsRows as $session) {
+            $posteKey = strtolower((string)$session['poste']);
+            if (isset($onlinePostesStatut[$posteKey]) && $onlinePostesStatut[$posteKey] === 'nordp') {
+                $nordpAvecSession[$posteKey] = true;
+            }
+        }
+        $occupiedOnline += count($nordpAvecSession);
         $occupancyRateOnline = $onlineTotal > 0 ? round(($occupiedOnline / $onlineTotal) * 100, 2) : 0.0;
 
         echo json_encode(array(
@@ -324,8 +328,8 @@ if ($action === 'tempsreel') {
                 'postes_hors_ligne' => $offlineTotal,
                 'sessions_ouvertes' => $openSessionsTotal,
                 'postes_distincts_avec_session_ouverte' => count($openSessionsDistinctPostes),
-                'sessions_ouvertes_sur_postes_hors_ligne' => $openSessionsOnOfflinePostes,
                 'postes_occupes_en_ligne' => $occupiedOnline,
+                'postes_nordp_en_ligne_avec_session' => count($nordpAvecSession),
                 'taux_occupation_postes_en_ligne' => $occupancyRateOnline
             ),
             'donnees' => array(
@@ -697,6 +701,9 @@ try {
 
         $nbJours = count($rows);
         $dureeMoyennePondereeSec = $sessionsTotal > 0 ? round($dureeTotaleSec / $sessionsTotal, 2) : 0.0;
+        $reqPostesTotal = $bdd->prepare("SELECT COUNT(DISTINCT LOWER(TRIM(poste))) FROM ".$tablePostesName." WHERE poste IS NOT NULL AND TRIM(poste) <> ''");
+        $reqPostesTotal->execute();
+        $nbPostes = (int)$reqPostesTotal->fetchColumn();
 
         echo json_encode(array(
             'ok' => true,
@@ -711,6 +718,7 @@ try {
             ),
             'resume' => array(
                 'nb_jours' => $nbJours,
+                'nb_postes' => $nbPostes,
                 'nb_sessions_total' => $sessionsTotal,
                 'duree_totale_heures' => round($dureeTotaleSec / 3600, 2),
                 'duree_moyenne_ponderee_min' => round($dureeMoyennePondereeSec / 60, 2)
